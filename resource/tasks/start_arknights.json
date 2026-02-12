@@ -1,0 +1,19 @@
+{
+  "name": "start_arknights",
+  "description": "启动明日方舟游戏",
+  "loop": false,
+  "steps": [
+    {
+      "action": "shell",
+      "shell_cmd": "am start -n com.hypergryph.arknights/com.u8.sdk.U8UnityContext"
+    },
+    {
+      "action": "wait",
+      "duration": 5000
+    },
+    {
+      "action": "screenshot",
+      "save_path": "start_screen.png"
+    }
+  ]
+}
