@@ -45,19 +45,19 @@ private:
         if (j.isMember("steps")) {
             for (const auto& step_json : j["steps"]) {
                 TaskStep step;
-                step.action = step_json.get("action", "").asString();
-                step.x = step_json.get("x", 0).asInt();
-                step.y = step_json.get("y", 0).asInt();
-                step.x2 = step_json.get("x2", 0).asInt();
-                step.y2 = step_json.get("y2", 0).asInt();
-                step.duration = step_json.get("duration", 0).asInt();
-                step.template_path = step_json.get("template_path", "").asString();
-                step.save_path = step_json.get("save_path", "").asString();
-                step.text = step_json.get("text", "").asString();
-                step.shell_cmd = step_json.get("shell_cmd", "").asString();
-                step.package_name = step_json.get("package_name", "").asString();
-                step.retry = step_json.get("retry", 1).asInt();
-                step.timeout = step_json.get("timeout", 5000).asInt();
+                step.action = step_json["action"].asString();
+                step.x = step_json["x"].asInt();
+                step.y = step_json["y"].asInt();
+                step.x2 = step_json["x2"].asInt();
+                step.y2 = step_json["y2"].asInt();
+                step.duration = step_json["duration"].asInt();
+                step.template_path = step_json["template_path"].asString();
+                step.save_path = step_json["save_path"].asString();
+                step.text = step_json["text"].asString();
+                step.shell_cmd = step_json["shell_cmd"].asString();
+                step.package_name = step_json["package_name"].asString();
+                step.retry = step_json["retry"].asInt();
+                step.timeout = step_json["timeout"].asInt();
                 config.steps.push_back(step);
             }
         }

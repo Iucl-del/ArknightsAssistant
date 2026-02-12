@@ -26,14 +26,10 @@ public:
     bool detect_text(const std::string& image_path, std::string& out_text);
     bool find_template(const std::string& image_path, const std::string& template_path, int& out_x, int& out_y);
 
-    // 任务注册与调度
-    void register_task(const std::string& name, Task task);
-    bool run_task(const std::string& name);
 
 private:
     std::unique_ptr<ADBClient> adb_client_;
     std::unique_ptr<OcrPack> vision_api_;
-    std::map<std::string, Task> task_map_;
     std::string device_address_;
     std::string adb_path_;
     std::string config_path_;

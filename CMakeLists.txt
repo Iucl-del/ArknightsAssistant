@@ -32,8 +32,8 @@ find_package(CUDAToolkit)
 
 # 添加可执行文件（包含所有源文件）
 add_executable(ArknightsAutoBot
-        src/adb/AdbStatus.cpp
-    src/adb/ADB.cpp
+    src/main.cpp
+    src/adb/AdbStatus.cpp
     src/adb/ADBClient.cpp
     src/SimpleController.cpp
     src/vision/ocr_det.cpp
@@ -41,7 +41,6 @@ add_executable(ArknightsAutoBot
     src/vision/ocr_rec.cpp
     src/vision/image_preprocessor.cpp
     src/vision/region_ocrer.cpp
-    src/vision/task_config.cpp
 )
 
 # 添加头文件目录（仅对 ArknightsAutoBot 目标有效）
@@ -49,6 +48,7 @@ target_include_directories(ArknightsAutoBot PRIVATE
     ${PROJECT_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/include/adb
     ${CMAKE_SOURCE_DIR}/include/vision
+    ${CMAKE_SOURCE_DIR}/include/task
 )
 
 target_link_libraries(ArknightsAutoBot

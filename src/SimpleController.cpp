@@ -75,15 +75,3 @@ bool SimpleController::find_template(const std::string& image_path, const std::s
     }
     return false;
 }
-
-void SimpleController::register_task(const std::string& name, std::function<void(SimpleController&)> task) {
-    task_map_[name] = std::move(task);
-}
-
-bool SimpleController::run_task(const std::string& name) {
-    if (task_map_.count(name)) {
-        task_map_[name](*this);
-        return true;
-    }
-    return false;
-}

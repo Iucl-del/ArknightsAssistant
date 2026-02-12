@@ -15,7 +15,7 @@ struct TaskStep {
     std::string save_path;      // 截图保存路径
     std::string text;           // OCR 匹配文本
     std::string shell_cmd;      // shell 命令
-    std::string package_name;   // 应用包名 (如 com.hypergryph.arknights/com.u8.sdk.U8UnityContext)
+    std::string package_name;   // 应用包名
     int retry = 1;              // 重试次数
     int timeout = 5000;         // 超时时间(ms)
 };
