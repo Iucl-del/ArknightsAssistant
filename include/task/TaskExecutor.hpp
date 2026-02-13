@@ -30,8 +30,10 @@ public:
             bool success = execute_steps(task.steps);
             if (success && task.on_success) {
                 run(*task.on_success);
-            } else if (!success && task.on_failure) {
-                run(*task.on_failure);
+            } else if (!success) {
+                if (task.on_failure) {
+                    run(*task.on_failure);
+                }
                 return false;
             }
         }
@@ -49,6 +51,7 @@ private:
     }
 
     bool execute_step(const TaskStep& step) {
+        std::cout << "执行步骤: " << step.action << std::endl;
         if (step.action == "click") {
             return controller_.click(step.x, step.y);
         }
@@ -57,7 +60,7 @@ private:
             return true;
         }
         else if (step.action == "screenshot") {
-            return controller_.capture_screenshot(step.save_path);
+            return controller_.capture_screenshot(step.save_name);
         }
         else if (step.action == "shell") {
             controller_.build_cmd(step.shell_cmd);
@@ -69,7 +72,7 @@ private:
         else if (step.action == "ocr") {
             for (int retry = 0; retry < step.retry; ++retry) {
                 std::string text;
-                if (controller_.detect_text(step.save_path, text)) {
+                if (controller_.detect_text(step.save_name, text)) {
                     if (text.find(step.text) != std::string::npos) {
                         return true;
                     }
@@ -80,7 +83,14 @@ private:
         }
         else if (step.action == "template") {
             int x, y;
-            if (controller_.find_template(step.save_path, step.template_path, x, y)) {
+            if (controller_.find_template(step.save_name, step.template_path, x, y)) {
+                return controller_.click(x, y);
+            }
+            return false;
+        }
+        else if (step.action == "ocr_click") {
+            int x, y;
+            if (controller_.find_text(step.save_name, step.text, x, y)) {
                 return controller_.click(x, y);
             }
             return false;

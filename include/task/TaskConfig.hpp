@@ -12,7 +12,7 @@ struct TaskStep {
     int y2 = 0;              // 滑动终点 y
     int duration = 0;        // 等待时间(ms) 或 滑动时长
     std::string template_path;  // 模板匹配图片路径
-    std::string save_path;      // 截图保存路径
+    std::string save_name;      // 截图保存文件名
     std::string text;           // OCR 匹配文本
     std::string shell_cmd;      // shell 命令
     std::string package_name;   // 应用包名

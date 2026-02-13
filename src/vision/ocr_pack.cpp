@@ -54,8 +54,6 @@ OcrPack::OcrPack(const std::string& det_model_path,
     // 初始化检测器和识别器
     detector_ = std::make_unique<TextDetector>(*env_, det_model_path);
     recognizer_ = std::make_unique<TextRecognizer>(*env_, rec_model_path, dict_path);
-
-    std::cout << "✅ OcrPack 初始化成功" << std::endl;
 }
 
 std::vector<std::pair<TextBox, std::string>> OcrPack::recognizeAll(const cv::Mat& img) {

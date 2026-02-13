@@ -4,6 +4,7 @@
 #include <chrono>
 #include "SimpleController.hpp"
 #include "TaskExecutor.hpp"
+#include "Config.hpp"
 
 void socket_adb() {
     ADBClient adb("/tmp/adb");
@@ -21,7 +22,7 @@ void socket_adb() {
 int main() {
     // 初始化控制器
     SimpleController controller;
-    if (!controller.connect("adb", "192.168.3.69:5555")) {
+    if (!controller.connect("/tmp/adb", "192.168.3.69:5555")) {
         std::cerr << "连接设备失败" << std::endl;
         return 1;
     }
@@ -29,8 +30,9 @@ int main() {
     // 初始化任务执行器
     TaskExecutor executor(controller);
 
-    // 加载任务配置
-    executor.load_task("resource/tasks/start_arknights.json");
+    // 使用项目根目录拼接任务配置路径
+    std::string task_path = std::string(Config::PROJECT_ROOT_DIR) + "/resource/tasks/start_arknights.json";
+    executor.load_task(task_path);
 
     // 执行任务
     if (executor.run("start_arknights")) {

@@ -41,6 +41,7 @@ add_executable(ArknightsAutoBot
     src/vision/ocr_rec.cpp
     src/vision/image_preprocessor.cpp
     src/vision/region_ocrer.cpp
+    src/vision/task_config.cpp
 )
 
 # 添加头文件目录（仅对 ArknightsAutoBot 目标有效）

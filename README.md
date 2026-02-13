@@ -1,1 +1,1 @@
-# ArknightsAutoBot
+# Arknights Assistant

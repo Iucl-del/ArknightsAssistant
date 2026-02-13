@@ -2,6 +2,7 @@
 #include "TaskConfig.hpp"
 #include <string>
 #include <fstream>
+#include <iostream>
 #include <json/json.h>
 
 // JSON 解析器
@@ -10,10 +11,17 @@ public:
     // 从 JSON 文件加载任务
     static TaskConfig load_from_file(const std::string& path) {
         std::ifstream file(path);
+        if (!file.is_open()) {
+            std::cerr << "无法打开任务文件: " << path << std::endl;
+            return TaskConfig{};
+        }
         Json::Value root;
         Json::CharReaderBuilder builder;
         std::string errors;
-        Json::parseFromStream(builder, file, &root, &errors);
+        if (!Json::parseFromStream(builder, file, &root, &errors)) {
+            std::cerr << "JSON 解析失败: " << errors << std::endl;
+            return TaskConfig{};
+        }
         return parse_task(root);
     }
 
@@ -52,7 +60,7 @@ private:
                 step.y2 = step_json["y2"].asInt();
                 step.duration = step_json["duration"].asInt();
                 step.template_path = step_json["template_path"].asString();
-                step.save_path = step_json["save_path"].asString();
+                step.save_name = step_json["save_name"].asString();
                 step.text = step_json["text"].asString();
                 step.shell_cmd = step_json["shell_cmd"].asString();
                 step.package_name = step_json["package_name"].asString();

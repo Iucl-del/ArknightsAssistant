@@ -25,6 +25,7 @@ public:
     // 视觉功能
     bool detect_text(const std::string& image_path, std::string& out_text);
     bool find_template(const std::string& image_path, const std::string& template_path, int& out_x, int& out_y);
+    bool find_text(const std::string& image_path, const std::string& target_text, int& out_x, int& out_y);
 
 
 private:
@@ -33,4 +34,5 @@ private:
     std::string device_address_;
     std::string adb_path_;
     std::string config_path_;
+    std::string work_dir_;  // ADB 工作目录
 };

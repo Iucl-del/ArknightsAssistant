@@ -9,11 +9,25 @@
     },
     {
       "action": "wait",
-      "duration": 5000
+      "duration": 10000
+    },
+    {
+      "action": "click",
+      "x": 960,
+      "y": 540
+    },
+    {
+      "action": "wait",
+      "duration": 7000
     },
     {
       "action": "screenshot",
-      "save_path": "start_screen.png"
+      "save_name": "start_screen.png"
+    },
+    {
+      "action": "ocr_click",
+      "save_name": "start_screen.png",
+      "text": "开始唤醒"
     }
   ]
 }
