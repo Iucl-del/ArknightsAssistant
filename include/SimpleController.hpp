@@ -27,6 +27,10 @@ public:
     bool find_template(const std::string& image_path, const std::string& template_path, int& out_x, int& out_y);
     bool find_text(const std::string& image_path, const std::string& target_text, int& out_x, int& out_y);
 
+    // OCR 区域识别
+    bool ocr_region(const std::string& image_path, int roi_x, int roi_y, int roi_w, int roi_h,
+                    int base_w, int base_h, std::string& out_text);
+
 
 private:
     std::unique_ptr<ADBClient> adb_client_;

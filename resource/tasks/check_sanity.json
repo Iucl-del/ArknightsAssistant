@@ -1,0 +1,26 @@
+{
+  "name": "check_sanity",
+  "description": "检测当前理智值",
+  "loop": false,
+  "steps": [
+    {
+      "action": "screenshot",
+      "save_name": "main_screen.png"
+    },
+    {
+      "action": "ocr_region",
+      "save_name": "main_screen.png",
+      "roi": {
+        "x": 800,
+        "y": 145,
+        "width": 100,
+        "height": 50,
+        "base_width": 1280,
+        "base_height": 720,
+        "preprocess": "binary",
+        "filter_pattern": "[0-9]+",
+        "debug_save": true
+      }
+    }
+  ]
+}

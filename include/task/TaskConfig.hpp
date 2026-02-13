@@ -2,31 +2,64 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <variant>
 
-// 单个操作步骤
-struct TaskStep {
-    std::string action;      // 操作类型: click, wait, screenshot, ocr, swipe, shell, start_app
-    int x = 0;               // 点击/滑动 x 坐标
-    int y = 0;               // 点击/滑动 y 坐标
-    int x2 = 0;              // 滑动终点 x
-    int y2 = 0;              // 滑动终点 y
-    int duration = 0;        // 等待时间(ms) 或 滑动时长
-    std::string template_path;  // 模板匹配图片路径
-    std::string save_name;      // 截图保存文件名
-    std::string text;           // OCR 匹配文本
-    std::string shell_cmd;      // shell 命令
-    std::string package_name;   // 应用包名
-    int retry = 1;              // 重试次数
-    int timeout = 5000;         // 超时时间(ms)
+// OCR 区域配置
+struct ROIConfig {
+    int x = 0;
+    int y = 0;
+    int width = 100;
+    int height = 50;
+    int base_width = 1280;
+    int base_height = 720;
+    std::string preprocess = "auto";
+    std::string filter_pattern;
+    bool debug_save = false;
 };
 
-// 任务描述
+// 基础操作：点击、滑动、等待
+struct BasicStep {
+    std::string action;      // click, swipe, wait
+    int x = 0;
+    int y = 0;
+    int x2 = 0;
+    int y2 = 0;
+    int duration = 0;
+};
+
+// 视觉操作：截图、OCR、模板匹配
+struct VisionStep {
+    std::string action;      // screenshot, ocr, ocr_click, ocr_region, template
+    std::string image_name;
+    std::string text;
+    std::string template_path;
+    std::optional<ROIConfig> roi;
+    int retry = 1;
+    int timeout = 5000;
+};
+
+// 系统操作：shell、启动应用
+struct SystemStep {
+    std::string action;      // shell, start_app
+    std::string cmd;
+    std::string package_name;
+};
+
+// 操作步骤变体
+using TaskStep = std::variant<BasicStep, VisionStep, SystemStep>;
+
+// 获取步骤 action 名称
+inline std::string get_step_action(const TaskStep& step) {
+    return std::visit([](auto&& arg) { return arg.action; }, step);
+}
+
+// 任务配置
 struct TaskConfig {
-    std::string name;              // 任务名称
-    std::string description;       // 任务描述
-    std::vector<TaskStep> steps;   // 操作步骤列表
-    bool loop = false;             // 是否循环执行
-    int loop_count = 1;            // 循环次数
-    std::optional<std::string> on_success;  // 成功后执行的任务
-    std::optional<std::string> on_failure;  // 失败后执行的任务
+    std::string name;
+    std::string description;
+    std::vector<TaskStep> steps;
+    bool loop = false;
+    int loop_count = 1;
+    std::optional<std::string> on_success;
+    std::optional<std::string> on_failure;
 };

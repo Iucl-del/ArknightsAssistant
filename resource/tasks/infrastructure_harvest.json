@@ -1,0 +1,73 @@
+{
+  "name": "infrastructure_harvest",
+  "description": "基建收获 - 收集制造站和贸易站产出",
+  "loop": false,
+  "steps": [
+    {
+      "action": "screenshot",
+      "save_name": "main_screen.png"
+    },
+    {
+      "action": "ocr_click",
+      "save_name": "main_screen.png",
+      "text": "基建"
+    },
+    {
+      "action": "wait",
+      "duration": 3000
+    },
+    {
+      "action": "screenshot",
+      "save_name": "infrastructure_screen.png"
+    },
+    {
+      "action": "ocr_click",
+      "save_name": "infrastructure_screen.png",
+      "text": "进驻总览"
+    },
+    {
+      "action": "wait",
+      "duration": 2000
+    },
+    {
+      "action": "screenshot",
+      "save_name": "overview_screen.png"
+    },
+    {
+      "action": "ocr_click",
+      "save_name": "overview_screen.png",
+      "text": "可收获"
+    },
+    {
+      "action": "wait",
+      "duration": 1500
+    },
+    {
+      "action": "screenshot",
+      "save_name": "harvest_screen.png"
+    },
+    {
+      "action": "ocr_click",
+      "save_name": "harvest_screen.png",
+      "text": "收取"
+    },
+    {
+      "action": "wait",
+      "duration": 1000
+    },
+    {
+      "action": "click",
+      "x": 100,
+      "y": 50
+    },
+    {
+      "action": "wait",
+      "duration": 1000
+    },
+    {
+      "action": "click",
+      "x": 100,
+      "y": 50
+    }
+  ]
+}

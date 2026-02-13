@@ -18,7 +18,7 @@
     },
     {
       "action": "wait",
-      "duration": 7000
+      "duration": 8000
     },
     {
       "action": "screenshot",

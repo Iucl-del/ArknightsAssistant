@@ -5,7 +5,34 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.1.0] - 2026-02-13
+## [0.2.0] - 2026-02-13
+
+### 新增
+- TaskExecutor 异步线程+队列模式
+  - `start()` 启动工作线程
+  - `stop()` 停止工作线程
+  - `submit(path)` 投递 JSON 任务路径
+  - `queue_size()` 获取队列长度
+  - `is_running()` 查询运行状态
+- `ocr_region` 任务动作：指定 ROI 区域进行 OCR 识别
+- 新增预置任务 `infrastructure_harvest.json`：基建收获
+
+### 变更
+- TaskConfig 使用 `std::variant` 重构步骤类型
+  - `BasicStep`：点击、滑动、等待
+  - `VisionStep`：截图、OCR、模板匹配
+  - `SystemStep`：Shell、启动应用
+- TaskExecutor 使用静态多态（函数重载）替代运行时分支
+- TaskExecutor 分离头文件和实现文件
+- 完善日志输出，添加步骤编号、耗时统计、emoji 标识
+- 删除冗余文件：`task_config.h/cpp`、`region_ocrer.h/cpp`
+
+### 文档
+- 新增 `dosc/项目结构图.md`：项目整体架构图
+
+---
+
+## [0.1.1] - 2026-02-13
 
 ### 新增
 - SimpleController 构造函数初始化 OCR 模块

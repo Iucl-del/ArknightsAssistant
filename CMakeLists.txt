@@ -36,12 +36,11 @@ add_executable(ArknightsAutoBot
     src/adb/AdbStatus.cpp
     src/adb/ADBClient.cpp
     src/SimpleController.cpp
+    src/task/TaskExecutor.cpp
     src/vision/ocr_det.cpp
     src/vision/ocr_pack.cpp
     src/vision/ocr_rec.cpp
     src/vision/image_preprocessor.cpp
-    src/vision/region_ocrer.cpp
-    src/vision/task_config.cpp
 )
 
 # 添加头文件目录（仅对 ArknightsAutoBot 目标有效）

@@ -2,102 +2,49 @@
 #include "TaskConfig.hpp"
 #include "TaskLoader.hpp"
 #include "SimpleController.hpp"
-#include <iostream>
-#include <map>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+#include <thread>
 
-// 任务执行器
 class TaskExecutor {
 public:
-    explicit TaskExecutor(SimpleController& controller) : controller_(controller) {}
+    explicit TaskExecutor(SimpleController& controller);
+    ~TaskExecutor();
 
-    // 加载任务配置文件
-    void load_task(const std::string& path) {
-        auto config = TaskLoader::load_from_file(path);
-        tasks_[config.name] = config;
-    }
+    // 启动工作线程
+    void start();
 
-    // 执行任务
-    bool run(const std::string& task_name) {
-        if (!tasks_.count(task_name)) {
-            std::cerr << "任务不存在: " << task_name << std::endl;
-            return false;
-        }
+    // 停止工作线程
+    void stop();
 
-        auto& task = tasks_[task_name];
-        int loop_count = task.loop ? task.loop_count : 1;
+    // 投递任务（JSON 路径）
+    void submit(const std::string& task_path);
 
-        for (int i = 0; i < loop_count; ++i) {
-            bool success = execute_steps(task.steps);
-            if (success && task.on_success) {
-                run(*task.on_success);
-            } else if (!success) {
-                if (task.on_failure) {
-                    run(*task.on_failure);
-                }
-                return false;
-            }
-        }
-        return true;
-    }
+    // 获取队列长度
+    size_t queue_size() const;
+
+    // 是否正在运行
+    bool is_running() const;
 
 private:
-    bool execute_steps(const std::vector<TaskStep>& steps) {
-        for (const auto& step : steps) {
-            if (!execute_step(step)) {
-                return false;
-            }
-        }
-        return true;
-    }
+    void worker_loop();
+    bool execute_task(const TaskConfig& task);
 
-    bool execute_step(const TaskStep& step) {
-        std::cout << "执行步骤: " << step.action << std::endl;
-        if (step.action == "click") {
-            return controller_.click(step.x, step.y);
-        }
-        else if (step.action == "wait") {
-            controller_.wait(step.duration);
-            return true;
-        }
-        else if (step.action == "screenshot") {
-            return controller_.capture_screenshot(step.save_name);
-        }
-        else if (step.action == "shell") {
-            controller_.build_cmd(step.shell_cmd);
-            return true;
-        }
-        else if (step.action == "swipe") {
-            return controller_.swipe(step.x, step.y, step.x2, step.y2, step.duration);
-        }
-        else if (step.action == "ocr") {
-            for (int retry = 0; retry < step.retry; ++retry) {
-                std::string text;
-                if (controller_.detect_text(step.save_name, text)) {
-                    if (text.find(step.text) != std::string::npos) {
-                        return true;
-                    }
-                }
-                controller_.wait(step.timeout / step.retry);
-            }
-            return false;
-        }
-        else if (step.action == "template") {
-            int x, y;
-            if (controller_.find_template(step.save_name, step.template_path, x, y)) {
-                return controller_.click(x, y);
-            }
-            return false;
-        }
-        else if (step.action == "ocr_click") {
-            int x, y;
-            if (controller_.find_text(step.save_name, step.text, x, y)) {
-                return controller_.click(x, y);
-            }
-            return false;
-        }
-        return false;
-    }
+    // 静态多态：函数重载执行不同类型步骤
+    bool execute(const BasicStep& step);
+    bool execute(const VisionStep& step);
+    bool execute(const SystemStep& step);
 
     SimpleController& controller_;
-    std::map<std::string, TaskConfig> tasks_;
+
+    // 任务队列（存放 JSON 路径）
+    std::queue<std::string> task_queue_;
+    mutable std::mutex queue_mutex_;
+    std::condition_variable queue_cv_;
+
+    // 工作线程
+    std::thread worker_thread_;
+    std::atomic<bool> running_{false};
 };

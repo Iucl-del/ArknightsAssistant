@@ -115,3 +115,39 @@ bool SimpleController::find_text(const std::string& image_path, const std::strin
     return false;
 }
 
+bool SimpleController::ocr_region(const std::string& image_path, int roi_x, int roi_y, int roi_w, int roi_h,
+                                   int base_w, int base_h, std::string& out_text) {
+    if (!vision_api_) return false;
+    std::string full_path = work_dir_ + "/" + image_path;
+    cv::Mat img = cv::imread(full_path);
+    if (img.empty()) return false;
+
+    // 根据实际分辨率缩放 ROI
+    float scale_x = static_cast<float>(img.cols) / base_w;
+    float scale_y = static_cast<float>(img.rows) / base_h;
+
+    int scaled_x = static_cast<int>(roi_x * scale_x);
+    int scaled_y = static_cast<int>(roi_y * scale_y);
+    int scaled_w = static_cast<int>(roi_w * scale_x);
+    int scaled_h = static_cast<int>(roi_h * scale_y);
+
+    // 确保 ROI 在图像范围内
+    scaled_x = std::max(0, std::min(scaled_x, img.cols - 1));
+    scaled_y = std::max(0, std::min(scaled_y, img.rows - 1));
+    scaled_w = std::min(scaled_w, img.cols - scaled_x);
+    scaled_h = std::min(scaled_h, img.rows - scaled_y);
+
+    cv::Rect roi(scaled_x, scaled_y, scaled_w, scaled_h);
+    cv::Mat roi_img = img(roi);
+
+    // 对 ROI 区域进行 OCR
+    auto results = vision_api_->recognizeAll(roi_img);
+    out_text.clear();
+    for (const auto& [box, text] : results) {
+        out_text += text;
+    }
+
+    std::cout << "OCR 区域识别结果: " << out_text << std::endl;
+    return !out_text.empty();
+}
+
