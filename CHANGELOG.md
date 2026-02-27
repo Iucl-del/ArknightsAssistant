@@ -5,6 +5,38 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 2026-02-27
+
+### 新增
+- SDK 打包支持：项目功能模块编译为共享库（`libArknightsAutoBot.so`）+ 静态库（`libArknightsAutoBot.a`），供其他程序集成调用
+- CMake 包配置导出：下游项目可通过 `find_package(ArknightsAutoBot)` 直接使用，提供 `ArknightsAutoBot::ArknightsAutoBot_shared` / `ArknightsAutoBot::ArknightsAutoBot_static` 两个目标
+- 新增 `cmake/ArknightsAutoBotConfig.cmake.in` 模板，自动处理第三方依赖查找（OpenCV、jsoncpp）
+- SDK 安装规则打包第三方库（ONNX Runtime、OpenCV、jsoncpp 的 `.so` 文件），下游无需自行安装
+- ONNX Runtime 头文件随 SDK 一并安装至 `include/onnxruntime/`
+- 新增 `scripts/pack_sdk.sh`：一键构建 + CPack 打包 SDK 发布包
+- CPack 配置生成 `.tar.gz`（跨平台）和 `.deb`（Linux）格式的 SDK 包
+
+### 变更
+- 可执行文件 `ArknightsAutoBot` 改为链接 SDK 共享库，不再直接编译所有源文件
+- 共享库与静态库的重复配置（include dirs、link libs、CUDA）合并为 `foreach()` 循环，消除冗余
+- 头文件安装从 4 条 `install()` 合并为 1 条 `install(DIRECTORY include/ ...)`
+- 第三方库 `.so` 收集逻辑抽取为 `install_imported_libs()` 辅助函数
+- 版本号统一使用 `project(VERSION)`，消除硬编码散落
+- FetchContent 调用统一为 `FetchContent_MakeAvailable()` 简化写法
+- `project()` 声明中新增 `VERSION 1.0.0`
+
+### SDK 安装产物
+
+| 路径 | 内容 |
+|------|------|
+| `lib/` | `libArknightsAutoBot.so` / `.a` + ONNX Runtime / OpenCV / jsoncpp 动态库 |
+| `include/` | 项目公共头文件 + ONNX Runtime 头文件 |
+| `lib/cmake/ArknightsAutoBot/` | CMake Config / Targets / Version 文件 |
+| `share/ArknightsAutoBot/models/` | OCR 模型（`.onnx` + 字典） |
+| `share/ArknightsAutoBot/resource/` | 任务 JSON + 模板图片 |
+
+---
+
 ## [0.3.0] - 2026-02-27
 
 ### 新增

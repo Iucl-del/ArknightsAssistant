@@ -38,11 +38,12 @@ struct VisionStep {
     int timeout = 5000;
 };
 
-// 系统操作：shell、启动应用
+// 系统操作：shell、启动应用、截图
 struct SystemStep {
-    std::string action;      // shell, start_app
+    std::string action;      // shell, start_app, screenshot
     std::string cmd;
     std::string package_name;
+    std::string image_name;  // screenshot 时的保存文件名
 };
 
 // 操作步骤变体

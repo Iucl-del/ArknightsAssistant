@@ -2,11 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include <onnxruntime_cxx_api.h>
 #include <vector>
-
-struct TextBox {
-    std::vector<cv::Point2f> box; ///< 文本框的四个顶点坐标
-    float score;                  ///< 检测置信度分数
-};
+#include "vision_types.h"
 
 /**
  * @brief 文本检测器类，基于ONNX模型实现文本区域检测。

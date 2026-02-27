@@ -42,7 +42,7 @@ ArknightsAutoBot/
 ### 第一步：克隆项目
 
 ```bash
-git clone <https://github.com/Iucl-del/ArknightsAssistant.git>
+git clone https://github.com/Iucl-del/ArknightsAssistant.git
 cd ArknightsAutoBot
 ```
 

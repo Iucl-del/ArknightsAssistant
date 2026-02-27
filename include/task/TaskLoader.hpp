@@ -59,7 +59,7 @@ private:
                     config.steps.push_back(step);
                 }
                 // 视觉操作
-                else if (action == "screenshot" || action == "ocr" || action == "ocr_click" ||
+                else if (action == "ocr" || action == "ocr_click" ||
                          action == "ocr_region" || action == "template") {
                     VisionStep step;
                     step.action = action;
@@ -86,11 +86,12 @@ private:
                     config.steps.push_back(step);
                 }
                 // 系统操作
-                else if (action == "shell" || action == "start_app") {
+                else if (action == "shell" || action == "start_app" || action == "screenshot") {
                     SystemStep step;
                     step.action = action;
                     step.cmd = s["shell_cmd"].asString();
                     step.package_name = s["package_name"].asString();
+                    step.image_name = s["save_name"].asString();
                     config.steps.push_back(step);
                 }
                 else {

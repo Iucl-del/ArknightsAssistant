@@ -66,9 +66,9 @@ void TaskExecutor::worker_loop() {
         }
 
         if (!task.first.empty()) {
-            auto task_path = TaskLoader::load_from_file(task.first);
-            if (!task_path.name.empty()) {
-                execute_task(task_path);
+            auto task_config = TaskLoader::load_from_file(task.first);
+            if (!task_config.name.empty()) {
+                execute_task(task_config);
                 task.second();
             } else {
                 std::cerr << "[TaskExecutor] ❌ 任务加载失败: " << task.first << std::endl;
@@ -140,10 +140,7 @@ bool TaskExecutor::execute(const BasicStep& step) {
 }
 
 bool TaskExecutor::execute(const VisionStep& step) {
-    if (step.action == "screenshot") {
-        std::cout << "📷 截图 -> " << step.image_name << std::endl;
-        return controller_.capture_screenshot(step.image_name);
-    } else if (step.action == "ocr_click") {
+    if (step.action == "ocr_click") {
         std::cout << "🔍🖱️  OCR点击: \"" << step.text << "\"" << std::endl;
         int x, y;
         if (controller_.find_text(step.image_name, step.text, x, y)) {
@@ -157,12 +154,12 @@ bool TaskExecutor::execute(const VisionStep& step) {
             std::cerr << "❌ ocr_region 需要配置 roi" << std::endl;
             return false;
         }
-        const auto& roi = step.roi.value();
-        std::cout << "🔍📐 OCR区域 (" << roi.x << ", " << roi.y << ", "
-                  << roi.width << "x" << roi.height << ")" << std::endl;
+        const auto& r = step.roi.value();
+        std::cout << "🔍📐 OCR区域 (" << r.x << ", " << r.y << ", "
+                  << r.width << "x" << r.height << ")" << std::endl;
         std::string text;
-        if (controller_.ocr_region(step.image_name, roi.x, roi.y, roi.width, roi.height,
-                                    roi.base_width, roi.base_height, text)) {
+        ROI roi{r.x, r.y, r.width, r.height, r.base_width, r.base_height};
+        if (controller_.detect_text(step.image_name, text, roi)) {
             std::cout << "  📝 结果: \"" << text << "\"" << std::endl;
             if (!step.text.empty()) {
                 return text.find(step.text) != std::string::npos;
@@ -185,7 +182,10 @@ bool TaskExecutor::execute(const VisionStep& step) {
 }
 
 bool TaskExecutor::execute(const SystemStep& step) {
-    if (step.action == "shell") {
+    if (step.action == "screenshot") {
+        std::cout << "📷 截图 -> " << step.image_name << std::endl;
+        return controller_.capture_screenshot(step.image_name);
+    } else if (step.action == "shell") {
         std::cout << "💻 Shell: " << step.cmd << std::endl;
         controller_.build_cmd(step.cmd);
         return true;

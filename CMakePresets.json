@@ -99,5 +99,32 @@
     { "name": "macos-vcpkg",        "configurePreset": "macos-vcpkg" },
     { "name": "linux-x64-cuda",            "configurePreset": "linux-x64-cuda" },
     { "name": "linux-x64-download-models", "configurePreset": "linux-x64-download-models" }
+  ],
+  "packagePresets": [
+    {
+      "name": "linux-x64",
+      "configurePreset": "linux-x64",
+      "generators": ["TGZ"]
+    },
+    {
+      "name": "linux-x64-vcpkg",
+      "configurePreset": "linux-x64-vcpkg",
+      "generators": ["TGZ", "DEB"]
+    },
+    {
+      "name": "linux-arm64-vcpkg",
+      "configurePreset": "linux-arm64-vcpkg",
+      "generators": ["TGZ", "DEB"]
+    },
+    {
+      "name": "windows-x64-vcpkg",
+      "configurePreset": "windows-x64-vcpkg",
+      "generators": ["ZIP"]
+    },
+    {
+      "name": "macos-vcpkg",
+      "configurePreset": "macos-vcpkg",
+      "generators": ["TGZ"]
+    }
   ]
 }

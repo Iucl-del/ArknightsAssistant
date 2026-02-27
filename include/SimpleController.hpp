@@ -3,9 +3,10 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include "adb/ADBClient.hpp"
 #include "vision/ocr_pack.h"
-
+#include "vision/vision_types.h"
 
 class SimpleController {
 public:
@@ -22,15 +23,11 @@ public:
     std::string build_cmd(const std::string& cmd);
     bool swipe(int x1, int y1, int x2, int y2, int duration_ms);
 
-    // 视觉功能
-    bool detect_text(const std::string& image_path, std::string& out_text);
+    // 视觉功能：不传 roi 则识别整张图，传入 roi 则只识别指定区域
+    bool detect_text(const std::string& image_path, std::string& out_text,
+                     std::optional<ROI> roi = std::nullopt);
     bool find_template(const std::string& image_path, const std::string& template_path, int& out_x, int& out_y);
     bool find_text(const std::string& image_path, const std::string& target_text, int& out_x, int& out_y);
-
-    // OCR 区域识别
-    bool ocr_region(const std::string& image_path, int roi_x, int roi_y, int roi_w, int roi_h,
-                    int base_w, int base_h, std::string& out_text);
-
 
 private:
     std::unique_ptr<ADBClient> adb_client_;
