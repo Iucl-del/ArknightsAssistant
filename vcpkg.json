@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "arknights-auto-bot",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "name": "opencv4",
+      "features": ["core", "imgproc", "imgcodecs", "highgui"]
+    },
+    "jsoncpp"
+  ]
+}
