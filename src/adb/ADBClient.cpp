@@ -7,7 +7,7 @@
 #include <sstream>
 #include <fstream>
 
-using boost::asio::ip::tcp;
+using asio::ip::tcp;
 
 ADBClient::ADBClient(std::string_view work_dir)
     : io_context_()
@@ -22,7 +22,7 @@ ADBClient::~ADBClient() = default;
 tcp::socket ADBClient::connect_to_server(std::string_view host, std::string_view port) {
     tcp::socket socket(io_context_);
     auto endpoints = resolver_.resolve(host, port);
-    boost::asio::connect(socket, endpoints);
+    asio::connect(socket, endpoints);
     return socket;
 }
 
@@ -32,22 +32,22 @@ std::string ADBClient::send_command(std::string_view command, std::string_view h
 
         // ADB协议: 4位十六进制长度 + 命令内容
         std::string request = std::format("{:04x}{}", command.length(), command);
-        boost::asio::write(socket, boost::asio::buffer(request));
+        asio::write(socket, asio::buffer(request));
 
         // 读取响应状态 (OKAY 或 FAIL)
         char status[4];
-        boost::asio::read(socket, boost::asio::buffer(status, 4));
+        asio::read(socket, asio::buffer(status, 4));
 
         std::string result;
         if (std::string_view(status, 4) == "OKAY") {
             // 读取响应长度
             char len_buf[4];
-            boost::asio::read(socket, boost::asio::buffer(len_buf, 4));
+            asio::read(socket, asio::buffer(len_buf, 4));
             int len = std::stoi(std::string(len_buf, 4), nullptr, 16);
 
             // 读取响应内容
             result.resize(len);
-            boost::asio::read(socket, boost::asio::buffer(result.data(), len));
+            asio::read(socket, asio::buffer(result.data(), len));
         }
 
         return result;
@@ -63,19 +63,19 @@ std::string ADBClient::send_device_command(std::string_view device_id, std::stri
         // 先选择设备
         std::string transport_cmd = std::format("host:transport:{}", device_id);
         std::string request = std::format("{:04x}{}", transport_cmd.length(), transport_cmd);
-        boost::asio::write(socket, boost::asio::buffer(request));
+        asio::write(socket, asio::buffer(request));
 
         char status[4];
-        boost::asio::read(socket, boost::asio::buffer(status, 4));
+        asio::read(socket, asio::buffer(status, 4));
         if (std::string_view(status, 4) != "OKAY") {
             return "";
         }
 
         // 发送命令
         request = std::format("{:04x}{}", command.length(), command);
-        boost::asio::write(socket, boost::asio::buffer(request));
+        asio::write(socket, asio::buffer(request));
 
-        boost::asio::read(socket, boost::asio::buffer(status, 4));
+        asio::read(socket, asio::buffer(status, 4));
         if (std::string_view(status, 4) != "OKAY") {
             return "";
         }
@@ -83,10 +83,10 @@ std::string ADBClient::send_device_command(std::string_view device_id, std::stri
         // 读取输出（直到连接关闭）
         std::string result;
         char buffer[4096];
-        boost::system::error_code ec;
+        asio::error_code ec;
         while (true) {
-            size_t n = socket.read_some(boost::asio::buffer(buffer), ec);
-            if (ec == boost::asio::error::eof || n == 0) {
+            size_t n = socket.read_some(asio::buffer(buffer), ec);
+            if (ec == asio::error::eof || n == 0) {
                 break;
             }
             if (ec) {
@@ -205,10 +205,10 @@ bool ADBClient::push(std::string_view device_id, std::string_view local_path, st
         // 选择设备
         std::string transport_cmd = std::format("host:transport:{}", device_id);
         std::string request = std::format("{:04x}{}", transport_cmd.length(), transport_cmd);
-        boost::asio::write(socket, boost::asio::buffer(request));
+        asio::write(socket, asio::buffer(request));
 
         char status[4];
-        boost::asio::read(socket, boost::asio::buffer(status, 4));
+        asio::read(socket, asio::buffer(status, 4));
         if (std::string_view(status, 4) != "OKAY") {
             return false;
         }
@@ -216,15 +216,15 @@ bool ADBClient::push(std::string_view device_id, std::string_view local_path, st
         // 发送shell命令
         std::string shell_cmd = std::format("shell:{}", cmd);
         request = std::format("{:04x}{}", shell_cmd.length(), shell_cmd);
-        boost::asio::write(socket, boost::asio::buffer(request));
+        asio::write(socket, asio::buffer(request));
 
-        boost::asio::read(socket, boost::asio::buffer(status, 4));
+        asio::read(socket, asio::buffer(status, 4));
         if (std::string_view(status, 4) != "OKAY") {
             return false;
         }
 
         // 发送文件内容
-        boost::asio::write(socket, boost::asio::buffer(content));
+        asio::write(socket, asio::buffer(content));
         return true;
     } catch (const std::exception&) {
         return false;

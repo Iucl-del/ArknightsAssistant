@@ -9,6 +9,12 @@ set(PROJECT_ROOT_DIR "${CMAKE_SOURCE_DIR}")
 # ============================================================
 option(ORT_WITH_CUDA "使用带 CUDA 支持的 ONNX Runtime 预构建版本" OFF)
 
+# FetchContent 统一在顶层引入，兼容 CMake 3.30+ CMP0169 弃用策略
+include(FetchContent)
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)
+endif()
+
 # ============================================================
 # ONNX Runtime
 # 优先使用本地 onnxruntime/ 目录；若不存在则自动下载对应平台预构建版本
@@ -21,12 +27,6 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/onnxruntime/lib" AND
     set(ONNXRUNTIME_DIR "${CMAKE_SOURCE_DIR}/onnxruntime")
 else()
     message(STATUS "[OnnxRuntime] 本地目录不存在，自动下载 v${ONNXRUNTIME_VERSION}...")
-    include(FetchContent)
-
-    # 兼容 CMake 3.30+ 弃用 FetchContent_Populate 的策略
-    if(POLICY CMP0169)
-        cmake_policy(SET CMP0169 OLD)
-    endif()
 
     if(ORT_WITH_CUDA)
         set(_ORT_SUFFIX "-gpu")
@@ -92,9 +92,6 @@ else()
         )
     endif()
     message(STATUS "[Models] 下载模型: ${MODELS_DOWNLOAD_URL}")
-    if(POLICY CMP0169)
-        cmake_policy(SET CMP0169 OLD)
-    endif()
     FetchContent_Declare(ocr_models
         URL "${MODELS_DOWNLOAD_URL}"
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
@@ -146,6 +143,29 @@ else()
 endif()
 
 # ============================================================
+# Asio（独立版，替代 Boost.Asio，header-only）
+# ============================================================
+find_package(asio CONFIG QUIET)
+if(asio_FOUND)
+    message(STATUS "[Asio] 通过 CMake config 找到")
+else()
+    message(STATUS "[Asio] 通过 FetchContent 下载 1.30.2...")
+    FetchContent_Declare(asio
+        URL "https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.tar.gz"
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+    FetchContent_GetProperties(asio)
+    if(NOT asio_POPULATED)
+        FetchContent_Populate(asio)
+    endif()
+    add_library(asio_imported INTERFACE)
+    target_include_directories(asio_imported INTERFACE "${asio_SOURCE_DIR}/asio/include")
+    target_compile_definitions(asio_imported INTERFACE ASIO_STANDALONE)
+    add_library(asio::asio ALIAS asio_imported)
+    message(STATUS "[Asio] 已下载至: ${asio_SOURCE_DIR}")
+endif()
+
+# ============================================================
 # CUDA（可选）
 # ============================================================
 find_package(CUDAToolkit QUIET)
@@ -176,6 +196,7 @@ target_link_libraries(ArknightsAutoBot
     ${OpenCV_LIBS}
     onnxruntime
     JsonCpp::JsonCpp
+    asio::asio
 )
 
 set_target_properties(ArknightsAutoBot PROPERTIES
