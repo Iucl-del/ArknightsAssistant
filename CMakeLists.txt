@@ -4,20 +4,15 @@ project(ArknightsAutoBot)
 set(CMAKE_CXX_STANDARD 20)
 set(PROJECT_ROOT_DIR "${CMAKE_SOURCE_DIR}")
 
-# ============================================================
-# 选项
-# ============================================================
 option(ORT_WITH_CUDA "使用带 CUDA 支持的 ONNX Runtime 预构建版本" OFF)
 
-# FetchContent 统一在顶层引入，兼容 CMake 3.30+ CMP0169 弃用策略
 include(FetchContent)
 if(POLICY CMP0169)
     cmake_policy(SET CMP0169 OLD)
 endif()
 
 # ============================================================
-# ONNX Runtime
-# 优先使用本地 onnxruntime/ 目录；若不存在则自动下载对应平台预构建版本
+# ONNX Runtime — 本地优先，否则按平台自动下载
 # ============================================================
 set(ONNXRUNTIME_VERSION "1.17.1")
 
@@ -26,25 +21,18 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/onnxruntime/lib" AND
     message(STATUS "[OnnxRuntime] 使用本地目录: ${CMAKE_SOURCE_DIR}/onnxruntime")
     set(ONNXRUNTIME_DIR "${CMAKE_SOURCE_DIR}/onnxruntime")
 else()
-    message(STATUS "[OnnxRuntime] 本地目录不存在，自动下载 v${ONNXRUNTIME_VERSION}...")
-
     if(ORT_WITH_CUDA)
         set(_ORT_SUFFIX "-gpu")
     else()
         set(_ORT_SUFFIX "")
     endif()
-
     if(WIN32)
         set(_ORT_PLATFORM "win-x64")
         set(_ORT_EXT "zip")
     elseif(APPLE)
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
-            set(_ORT_PLATFORM "osx-arm64")
-        else()
-            set(_ORT_PLATFORM "osx-x86_64")
-        endif()
+        set(_ORT_PLATFORM "osx-${CMAKE_SYSTEM_PROCESSOR}")
         set(_ORT_EXT "tgz")
-    else()  # Linux
+    else()
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
             set(_ORT_PLATFORM "linux-aarch64")
         else()
@@ -52,12 +40,10 @@ else()
         endif()
         set(_ORT_EXT "tgz")
     endif()
-
     set(_ORT_PKG "onnxruntime-${_ORT_PLATFORM}${_ORT_SUFFIX}-${ONNXRUNTIME_VERSION}")
     FetchContent_Declare(onnxruntime
         URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/${_ORT_PKG}.${_ORT_EXT}"
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     FetchContent_GetProperties(onnxruntime)
     if(NOT onnxruntime_POPULATED)
         FetchContent_Populate(onnxruntime)
@@ -66,42 +52,25 @@ else()
     message(STATUS "[OnnxRuntime] 已下载至: ${ONNXRUNTIME_DIR}")
 endif()
 
-include_directories(${ONNXRUNTIME_DIR}/include)
-link_directories(${ONNXRUNTIME_DIR}/lib)
-
 # ============================================================
-# OCR 模型
-# 优先使用本地 models/ 目录；若不存在则从 MODELS_DOWNLOAD_URL 下载
-# 打包命令: bash scripts/pack_models.sh
+# OCR 模型 — 本地优先，否则从 MODELS_DOWNLOAD_URL 下载
 # ============================================================
-set(MODELS_DOWNLOAD_URL "" CACHE STRING "OCR 模型下载 URL（models.tar.gz），本地已有模型时忽略此项")
+set(MODELS_DOWNLOAD_URL "" CACHE STRING "OCR 模型下载 URL（models.tar.gz），本地已有模型时忽略")
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/models/onnx/ch_ppocr_det.onnx")
-    message(STATUS "[Models] 使用本地模型: ${CMAKE_SOURCE_DIR}/models")
+    message(STATUS "[Models] 使用本地模型")
+elseif(NOT MODELS_DOWNLOAD_URL)
+    message(FATAL_ERROR "[Models] 未找到本地模型，请设置 -DMODELS_DOWNLOAD_URL=<url> 或手动放入 models/ 目录")
 else()
-    if(NOT MODELS_DOWNLOAD_URL)
-        message(FATAL_ERROR
-            "[Models] 未找到本地模型文件，且未设置 MODELS_DOWNLOAD_URL\n"
-            "  方式一: 提供下载链接\n"
-            "    cmake ... -DMODELS_DOWNLOAD_URL=https://github.com/<owner>/<repo>/releases/download/<tag>/models.tar.gz\n"
-            "  方式二: 手动将模型放入 models/ 目录\n"
-            "    models/onnx/ch_ppocr_det.onnx\n"
-            "    models/onnx/ch_ppocr_cls.onnx\n"
-            "    models/onnx/ch_ppocr_rec.onnx\n"
-            "    models/ppocr_keys_v1.txt"
-        )
-    endif()
-    message(STATUS "[Models] 下载模型: ${MODELS_DOWNLOAD_URL}")
     FetchContent_Declare(ocr_models
         URL "${MODELS_DOWNLOAD_URL}"
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-        SOURCE_DIR "${CMAKE_SOURCE_DIR}/models"
-    )
+        SOURCE_DIR "${CMAKE_SOURCE_DIR}/models")
     FetchContent_GetProperties(ocr_models)
     if(NOT ocr_models_POPULATED)
         FetchContent_Populate(ocr_models)
     endif()
-    message(STATUS "[Models] 模型下载完成: ${CMAKE_SOURCE_DIR}/models")
+    message(STATUS "[Models] 模型已下载至: ${CMAKE_SOURCE_DIR}/models")
 endif()
 
 # ============================================================
@@ -109,51 +78,34 @@ endif()
 # ============================================================
 configure_file(
     ${CMAKE_SOURCE_DIR}/include/Config.hpp.in
-    ${CMAKE_SOURCE_DIR}/include/Config.hpp
-    @ONLY
-)
+    ${CMAKE_SOURCE_DIR}/include/Config.hpp @ONLY)
 
 # ============================================================
-# OpenCV
+# 第三方依赖
 # ============================================================
 find_package(OpenCV REQUIRED)
-include_directories(${OpenCV_INCLUDE_DIRS})
 
-# ============================================================
-# jsoncpp
-# 优先使用 CMake Config 模式（vcpkg / 现代系统包），回退到 pkg-config
-# 统一暴露 JsonCpp::JsonCpp 目标
-# ============================================================
+# jsoncpp: CMake Config → pkg-config 回退，统一暴露 JsonCpp::JsonCpp
 find_package(jsoncpp CONFIG QUIET)
 if(jsoncpp_FOUND)
-    # 兼容 vcpkg (JsonCpp::JsonCpp) 与部分系统包 (jsoncpp_lib)
     if(NOT TARGET JsonCpp::JsonCpp AND TARGET jsoncpp_lib)
         add_library(JsonCpp::JsonCpp ALIAS jsoncpp_lib)
     endif()
-    message(STATUS "[jsoncpp] 通过 CMake config 找到")
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(JSONCPP REQUIRED jsoncpp)
     add_library(JsonCpp::JsonCpp INTERFACE IMPORTED)
     set_target_properties(JsonCpp::JsonCpp PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${JSONCPP_INCLUDE_DIRS}"
-        INTERFACE_LINK_LIBRARIES      "${JSONCPP_LIBRARIES}"
-    )
-    message(STATUS "[jsoncpp] 通过 pkg-config 找到")
+        INTERFACE_LINK_LIBRARIES      "${JSONCPP_LIBRARIES}")
 endif()
 
-# ============================================================
-# Asio（独立版，替代 Boost.Asio，header-only）
-# ============================================================
+# Asio: CMake Config → FetchContent 回退
 find_package(asio CONFIG QUIET)
-if(asio_FOUND)
-    message(STATUS "[Asio] 通过 CMake config 找到")
-else()
-    message(STATUS "[Asio] 通过 FetchContent 下载 1.30.2...")
+if(NOT asio_FOUND)
     FetchContent_Declare(asio
         URL "https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.tar.gz"
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     FetchContent_GetProperties(asio)
     if(NOT asio_POPULATED)
         FetchContent_Populate(asio)
@@ -162,12 +114,8 @@ else()
     target_include_directories(asio_imported INTERFACE "${asio_SOURCE_DIR}/asio/include")
     target_compile_definitions(asio_imported INTERFACE ASIO_STANDALONE)
     add_library(asio::asio ALIAS asio_imported)
-    message(STATUS "[Asio] 已下载至: ${asio_SOURCE_DIR}")
 endif()
 
-# ============================================================
-# CUDA（可选）
-# ============================================================
 find_package(CUDAToolkit QUIET)
 
 # ============================================================
@@ -187,25 +135,26 @@ add_executable(ArknightsAutoBot
 
 target_include_directories(ArknightsAutoBot PRIVATE
     ${PROJECT_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/adb
-    ${CMAKE_SOURCE_DIR}/include/vision
-    ${CMAKE_SOURCE_DIR}/include/task
+    ${PROJECT_SOURCE_DIR}/include/adb
+    ${PROJECT_SOURCE_DIR}/include/vision
+    ${PROJECT_SOURCE_DIR}/include/task
+    ${ONNXRUNTIME_DIR}/include
+    ${OpenCV_INCLUDE_DIRS}
 )
 
-target_link_libraries(ArknightsAutoBot
+target_link_libraries(ArknightsAutoBot PRIVATE
     ${OpenCV_LIBS}
-    onnxruntime
     JsonCpp::JsonCpp
     asio::asio
+    ${ONNXRUNTIME_DIR}/lib/libonnxruntime${CMAKE_SHARED_LIBRARY_SUFFIX}
 )
 
 set_target_properties(ArknightsAutoBot PROPERTIES
-    INSTALL_RPATH "${ONNXRUNTIME_DIR}/lib"
-    BUILD_WITH_INSTALL_RPATH TRUE
-)
+    BUILD_RPATH   "${ONNXRUNTIME_DIR}/lib"
+    INSTALL_RPATH "${ONNXRUNTIME_DIR}/lib")
 
 if(CUDAToolkit_FOUND)
-    target_link_libraries(ArknightsAutoBot CUDA::cudart)
+    target_link_libraries(ArknightsAutoBot PRIVATE CUDA::cudart)
     message(STATUS "CUDA found: ${CUDAToolkit_VERSION}")
 else()
     message(STATUS "CUDA not found, building CPU-only version")
