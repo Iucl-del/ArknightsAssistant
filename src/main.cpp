@@ -29,17 +29,11 @@ int main() {
 
     // 初始化任务执行器
     TaskExecutor executor(controller);
-
+    executor.start();
     // 使用项目根目录拼接任务配置路径
     std::string task_path = std::string(Config::PROJECT_ROOT_DIR) + "/resource/tasks/start_arknights.json";
-    executor.load_task(task_path);
+    executor.submit(task_path,[&](){});
 
-    // 执行任务
-    if (executor.run("start_arknights")) {
-        std::cout << "任务执行成功" << std::endl;
-    } else {
-        std::cout << "任务执行失败" << std::endl;
-    }
 
     return 0;
 }

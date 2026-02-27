@@ -26,10 +26,10 @@ void TaskExecutor::stop() {
     std::cout << "[TaskExecutor] ⏹️ 工作线程已停止" << std::endl;
 }
 
-void TaskExecutor::submit(const std::string& task_path) {
+void TaskExecutor::submit(const std::string& task_path,TaskCallback func) {
     {
         std::lock_guard<std::mutex> lock(queue_mutex_);
-        task_queue_.push(task_path);
+        task_queue_.push(std::make_pair(task_path, func));
         std::cout << "[TaskExecutor] 📥 任务已投递: " << task_path
                   << " (队列长度: " << task_queue_.size() << ")" << std::endl;
     }
@@ -47,7 +47,7 @@ bool TaskExecutor::is_running() const {
 
 void TaskExecutor::worker_loop() {
     while (running_.load()) {
-        std::string task_path;
+        std::pair<std::string,TaskCallback> task;
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             queue_cv_.wait(lock, [this] {
@@ -57,19 +57,21 @@ void TaskExecutor::worker_loop() {
             if (!running_.load() && task_queue_.empty()) break;
 
             if (!task_queue_.empty()) {
-                task_path = task_queue_.front();
+                task = task_queue_.front();
+
                 task_queue_.pop();
-                std::cout << "[TaskExecutor] 📤 取出任务: " << task_path
+                std::cout << "[TaskExecutor] 📤 取出任务: " << task.first
                           << " (剩余: " << task_queue_.size() << ")" << std::endl;
             }
         }
 
-        if (!task_path.empty()) {
-            auto task = TaskLoader::load_from_file(task_path);
-            if (!task.name.empty()) {
-                execute_task(task);
+        if (!task.first.empty()) {
+            auto task_path = TaskLoader::load_from_file(task.first);
+            if (!task_path.name.empty()) {
+                execute_task(task_path);
+                task.second();
             } else {
-                std::cerr << "[TaskExecutor] ❌ 任务加载失败: " << task_path << std::endl;
+                std::cerr << "[TaskExecutor] ❌ 任务加载失败: " << task.first << std::endl;
             }
         }
     }

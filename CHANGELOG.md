@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.2.1] - 2026-02-27
+
+### 新增
+- `TaskCallback`：使用 `using TaskCallback = std::function<void()>` 定义任务完成回调类型
+- `submit(path, callback)` 支持在投递任务时附带回调函数，任务执行完毕后自动触发
+
+---
+
 ## [0.2.0] - 2026-02-13
 
 ### 新增

@@ -8,6 +8,8 @@
 #include <atomic>
 #include <thread>
 
+using TaskCallback = std::function<void()>;
+
 class TaskExecutor {
 public:
     explicit TaskExecutor(SimpleController& controller);
@@ -20,7 +22,7 @@ public:
     void stop();
 
     // 投递任务（JSON 路径）
-    void submit(const std::string& task_path);
+    void submit(const std::string& task_path,TaskCallback func);
 
     // 获取队列长度
     size_t queue_size() const;
@@ -40,7 +42,7 @@ private:
     SimpleController& controller_;
 
     // 任务队列（存放 JSON 路径）
-    std::queue<std::string> task_queue_;
+    std::queue<std::pair<std::string,TaskCallback>> task_queue_;
     mutable std::mutex queue_mutex_;
     std::condition_variable queue_cv_;
 
