@@ -5,6 +5,37 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.3.0] - 2026-02-27
+
+### 新增
+- 跨平台构建支持
+  - 新增 `CMakePresets.json`：标准化多平台构建预设（Linux x64/ARM64、Windows x64、macOS）
+  - 新增 `vcpkg.json`：声明 OpenCV4、jsoncpp、Asio 依赖，vcpkg 一键安装
+  - 新增 `scripts/pack_models.sh`：OCR 模型打包脚本，用于上传至 GitHub Releases
+
+### 变更
+- **ONNX Runtime**：自动检测本地 `onnxruntime/` 目录，不存在时通过 CMake FetchContent 从 GitHub Releases 下载对应平台预构建版本（支持 win-x64 / osx-arm64 / osx-x86_64 / linux-x64 / linux-aarch64）
+- **Asio**：用独立 Asio 1.30.2 替换 Boost.Asio，移除对 Boost 的依赖
+- **jsoncpp**：支持 vcpkg CONFIG 模式与 pkg-config 双重回退，统一暴露 `JsonCpp::JsonCpp` target
+- **OCR 模型**：从 git 仓库迁移至 [GitHub Releases v1.0-models](https://github.com/Iucl-del/ArknightsAssistant/releases/tag/v1.0-models)，构建时通过 `MODELS_DOWNLOAD_URL` 自动下载
+- 新增 `ORT_WITH_CUDA` CMake 选项，控制是否使用 ONNX Runtime GPU 构建
+- 修复 `include(FetchContent)` 仅在部分分支引入导致模型下载段崩溃的 Bug
+
+### 移除
+- 移除对 Boost 的依赖
+
+### 依赖变更
+
+| 依赖 | 旧方式 | 新方式 |
+|------|-------|-------|
+| OpenCV | 系统安装 | vcpkg / 系统安装 |
+| jsoncpp | pkg-config | vcpkg / pkg-config |
+| ONNX Runtime | 本地目录 | 本地目录 / FetchContent 自动下载 |
+| Boost.Asio | 系统安装 | 独立 Asio（vcpkg / FetchContent） |
+| OCR 模型 | git 仓库 | GitHub Releases |
+
+---
+
 ## [0.2.1] - 2026-02-27
 
 ### 新增
@@ -96,8 +127,7 @@
 - OpenCV 4.6
 - ONNX Runtime 1.17.1
 - jsoncpp
-- fastdeploy
-- Boost
+- Boost.Asio
 - CUDA Runtime (可选)
 
 ---
