@@ -1,4 +1,4 @@
-# Changelog
+# Arknights Assistant
 
 本文件记录 ArknightsAutoBot 项目的所有重要更改。
 
