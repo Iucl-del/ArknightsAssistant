@@ -9,7 +9,7 @@
 int main() {
     // 初始化控制器
     SimpleController controller;
-    if (!controller.connect("/tmp/adb", "192.168.3.69:5555")) {
+    if (!controller.connect("/tmp/adb", "192.168.3.69", "5555")) {
         std::cerr << "连接设备失败" << std::endl;
         return 1;
     }

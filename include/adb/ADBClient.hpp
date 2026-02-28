@@ -8,10 +8,6 @@
 // ADB 客户端，Socket 直连 ADB Server，支持常用设备管理与文件操作
 class ADBClient {
 public:
-    /**
-     * @brief 构造函数
-     * @param work_dir ADB工作目录，所有adb产生的文件存放于此，默认为当前目录
-     */
     explicit ADBClient(std::string_view work_dir = "adb");
     ~ADBClient();
 

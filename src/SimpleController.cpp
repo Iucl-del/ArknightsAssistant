@@ -2,9 +2,7 @@
 #include "Config.hpp"
 #include <thread>
 #include <chrono>
-#include <fstream>
 #include <format>
-#include <json/json.h>
 #include <opencv2/opencv.hpp>
 
 SimpleController::SimpleController() {
@@ -20,29 +18,13 @@ SimpleController::SimpleController() {
 
 SimpleController::~SimpleController() = default;
 
-bool SimpleController::connect(const std::string& adb_path, const std::string& address, const std::string& config_path) {
-    adb_path_ = adb_path;
-    device_address_ = address;
-    config_path_ = config_path;
+bool SimpleController::connect(const std::string& adb_path, const std::string& ip, const std::string& port) {
+    device_address_ = ip + ":" + port;
     work_dir_ = adb_path;
     game_package_ = "com.hypergryph.arknights/com.u8.sdk.U8UnityContext";
 
-    // 如果提供了配置文件，从中读取 game_package
-    if (!config_path.empty()) {
-        std::ifstream cfg(config_path);
-        if (cfg.is_open()) {
-            Json::Value root;
-            Json::CharReaderBuilder builder;
-            std::string errors;
-            if (Json::parseFromStream(builder, cfg, &root, &errors)) {
-                game_package_ = root.get("game_package", game_package_).asString();
-            }
-        }
-    }
-
     adb_client_ = std::make_unique<ADBClient>(adb_path);
-
-    return adb_client_->connect(address.substr(0, address.find(':')), address.substr(address.find(':')+1));
+    return adb_client_->connect(ip, port);
 }
 
 bool SimpleController::capture_screenshot(const std::string& filename) {

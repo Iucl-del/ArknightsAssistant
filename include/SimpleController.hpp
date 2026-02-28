@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <functional>
-#include <map>
 #include <memory>
 #include <optional>
 #include <atomic>
@@ -14,8 +13,9 @@ public:
     using Task = std::function<void(SimpleController&)>;
     SimpleController();
     ~SimpleController();
-    // 连接设备
-    bool connect(const std::string& adb_path, const std::string& address, const std::string& config_path = "");
+
+    // 连接设备（ip 和 port 分开传，与 ADBClient 保持一致）
+    bool connect(const std::string& adb_path, const std::string& ip, const std::string& port);
 
     // 基本操作
     bool capture_screenshot(const std::string& filename);
@@ -39,9 +39,7 @@ private:
     std::unique_ptr<ADBClient> adb_client_;
     std::unique_ptr<OcrPack> vision_api_;
     std::string device_address_;
-    std::string adb_path_;
-    std::string config_path_;
-    std::string work_dir_;          // ADB 工作目录
-    std::string game_package_;      // 游戏包名/Activity
+    std::string work_dir_;
+    std::string game_package_;
     std::atomic<int> screenshot_seq_{0};
 };
