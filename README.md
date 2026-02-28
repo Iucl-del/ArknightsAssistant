@@ -7,7 +7,7 @@
 - 🎮 **ADB 设备控制** - 支持点击、滑动、截图等操作
 - 🔍 **OCR 文字识别** - 基于 PP-OCR + ONNX Runtime，识别游戏界面文字
 - 🖼️ **模板匹配** - 基于 OpenCV 的图像模板匹配
-- 📋 **JSON 任务配置** - 灵活的 JSON 格式任务定义
+- 📋 **节点式任务配置** - JSON 定义识别+动作节点，自动轮询截图
 - 🔄 **异步任务队列** - 支持任务排队执行
 
 ## 项目结构
@@ -130,22 +130,9 @@ OCR 模型文件（~50MB）支持两种管理方式：
 模型已托管于 [GitHub Releases v1.0-models](https://github.com/Iucl-del/ArknightsAssistant/releases/tag/v1.0-models)，构建时通过 `MODELS_DOWNLOAD_URL` 自动下载：
 
 ```bash
-# 使用内置预设（已包含下载链接）
-cmake --preset linux-x64-download-models
-cmake --build --preset linux-x64-download-models
-```
-
-或手动指定：
-```bash
 cmake --preset linux-x64-vcpkg \
     -DMODELS_DOWNLOAD_URL=https://github.com/Iucl-del/ArknightsAssistant/releases/download/v1.0-models/models.tar.gz
 cmake --build --preset linux-x64-vcpkg
-```
-
-若需重新打包上传模型（更新模型时）：
-```bash
-bash scripts/pack_models.sh
-gh release upload v1.0-models models.tar.gz --clobber
 ```
 
 ## 使用
@@ -155,76 +142,76 @@ gh release upload v1.0-models models.tar.gz --clobber
 ```cpp
 #include "SimpleController.hpp"
 #include "task/TaskExecutor.hpp"
+#include "Config.hpp"
 
 int main() {
     SimpleController controller;
-    controller.connect("adb", "192.168.3.69:5555");
+    controller.connect("/tmp/adb", "192.168.3.69:5555");
 
     TaskExecutor executor(controller);
-    executor.start();  // 启动工作线程
+    executor.start();
 
-    // 投递任务
-    executor.submit("resource/tasks/start_arknights.json");
+    std::string task_path = std::string(Config::PROJECT_ROOT_DIR)
+                          + "/resource/tasks/start_arknights.json";
+    executor.submit(task_path, [&](){});
 
-    // 等待任务完成...
-    
-    executor.stop();   // 停止工作线程
     return 0;
 }
 ```
 
 ### JSON 任务配置
 
-任务配置文件位于 `resource/tasks/` 目录，支持以下操作：
+任务采用**节点式设计**，每个节点 = 识别 + 动作。执行器自动轮询截图，直到识别通过再执行动作，**无需手动插入截图或等待步骤**。
 
-#### 基础操作 (BasicStep)
+#### 识别类型
 
-| 操作 | 说明 | 参数 |
+| 类型 | 说明 | 必要参数 |
+|------|------|----------|
+| `DirectHit` | 直接执行，不做识别 | 无 |
+| `OCR` | 文字识别，等待目标文字出现 | `expected` |
+| `TemplateMatch` | 模板匹配，等待目标图片出现 | `template` |
+
+#### 动作类型
+
+| 类型 | 说明 | 参数 |
 |------|------|------|
-| `click` | 点击 | `x`, `y` |
-| `swipe` | 滑动 | `x`, `y`, `x2`, `y2`, `duration` |
-| `wait` | 等待 | `duration` (毫秒) |
+| `Click` | 点击（识别位置或指定坐标） | `target`: `[x, y]`（可选） |
+| `Swipe` | 滑动 | `target`: `[x1, y1, x2, y2, duration]` |
+| `StartApp` | 启动游戏（无需参数） | 无 |
+| `StopApp` | 关闭游戏（无需参数） | 无 |
 
-#### 视觉操作 (VisionStep)
+#### 节点可选参数
 
-| 操作 | 说明 | 参数 |
-|------|------|------|
-| `screenshot` | 截图 | `save_name` |
-| `ocr_click` | OCR 识别并点击 | `save_name`, `text` |
-| `ocr_region` | 区域 OCR | `save_name`, `roi`, `text` |
-| `template` | 模板匹配并点击 | `save_name`, `template_path` |
-
-#### 系统操作 (SystemStep)
-
-| 操作 | 说明 | 参数 |
-|------|------|------|
-| `shell` | 执行 Shell 命令 | `shell_cmd` |
-| `start_app` | 启动应用 | `package_name` |
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `timeout` | 20000 | 识别超时时间（ms） |
+| `interval` | 1000 | 识别轮询间隔（ms） |
+| `pre_delay` | 0 | 动作前延迟（ms） |
+| `post_delay` | 500 | 动作后延迟（ms） |
 
 ### 任务示例
 
 ```json
 {
-  "name": "start_arknights",
-  "description": "启动明日方舟游戏",
-  "loop": false,
-  "steps": [
+  "name": "启动明日方舟",
+  "nodes": [
     {
-      "action": "shell",
-      "shell_cmd": "am start -n com.hypergryph.arknights/com.u8.sdk.U8UnityContext"
+      "recognition": "DirectHit",
+      "action": "StartApp",
+      "post_delay": 10000
     },
     {
-      "action": "wait",
-      "duration": 10000
+      "recognition": "DirectHit",
+      "action": "Click",
+      "target": [960, 540],
+      "post_delay": 500
     },
     {
-      "action": "screenshot",
-      "save_name": "start_screen.png"
-    },
-    {
-      "action": "ocr_click",
-      "save_name": "start_screen.png",
-      "text": "开始唤醒"
+      "recognition": "OCR",
+      "expected": "开始唤醒",
+      "action": "Click",
+      "timeout": 20000,
+      "interval": 2000
     }
   ]
 }
@@ -232,53 +219,35 @@ int main() {
 
 ## API 说明
 
+### SimpleController
+
+| 方法 | 说明 |
+|------|------|
+| `connect(adb_path, address, config_path)` | 连接设备 |
+| `click(x, y)` | 点击 |
+| `swipe(x1, y1, x2, y2, duration)` | 滑动 |
+| `wait(ms)` | 等待 |
+| `capture_screenshot(filename)` | 截图 |
+| `auto_screenshot(hint)` | 自动生成文件名并截图 |
+| `start_app()` | 启动游戏 |
+| `stop_app()` | 关闭游戏 |
+| `find_text(image, text, x, y)` | OCR 查找文本 |
+| `find_template(image, template, x, y)` | 模板匹配 |
+| `detect_text(image, out_text, roi)` | 区域 OCR |
+
 ### TaskExecutor
 
 | 方法 | 说明 |
 |------|------|
 | `start()` | 启动工作线程 |
 | `stop()` | 停止工作线程 |
-| `submit(path)` | 投递任务 (JSON 路径) |
+| `submit(path, callback)` | 投递任务 (JSON 路径 + 回调) |
 | `queue_size()` | 获取队列长度 |
 | `is_running()` | 是否正在运行 |
 
-### SimpleController
+## 更新日志
 
-| 方法 | 说明 |
-|------|------|
-| `connect(adb_path, address)` | 连接设备 |
-| `click(x, y)` | 点击 |
-| `swipe(x1, y1, x2, y2, duration)` | 滑动 |
-| `capture_screenshot(filename)` | 截图 |
-| `find_text(image, text, x, y)` | OCR 查找文本 |
-| `find_template(image, template, x, y)` | 模板匹配 |
-
-## 日志输出示例
-
-```
-============================================================
-[TaskExecutor] 🚀 开始执行任务: start_arknights
-[TaskExecutor] 📋 启动明日方舟游戏
-[TaskExecutor] 📝 步骤总数: 5
-============================================================
-
-[Step 1/5] 💻 Shell: am start -n com.hypergryph.arknights/...
-[Step 1] ✅ 完成 (120ms)
-
-[Step 2/5] ⏳ 等待 10000ms
-[Step 2] ✅ 完成 (10001ms)
-
-[Step 3/5] 📷 截图 -> start_screen.png
-[Step 3] ✅ 完成 (350ms)
-
-[Step 4/5] 🔍🖱️  OCR点击: "开始唤醒"
-  ✅ 位置: (640, 500)
-[Step 4] ✅ 完成 (1200ms)
-
-============================================================
-[TaskExecutor] ✅ 任务完成: start_arknights
-============================================================
-```
+详见 [CHANGELOG.md](CHANGELOG.md)
 
 ## 许可证
 
