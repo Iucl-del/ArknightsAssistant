@@ -2,7 +2,9 @@
 #include "Config.hpp"
 #include <thread>
 #include <chrono>
+#include <fstream>
 #include <format>
+#include <json/json.h>
 #include <opencv2/opencv.hpp>
 
 SimpleController::SimpleController() {
@@ -22,7 +24,22 @@ bool SimpleController::connect(const std::string& adb_path, const std::string& a
     adb_path_ = adb_path;
     device_address_ = address;
     config_path_ = config_path;
-    work_dir_ = adb_path;  // ADB 工作目录
+    work_dir_ = adb_path;
+    game_package_ = "com.hypergryph.arknights/com.u8.sdk.U8UnityContext";
+
+    // 如果提供了配置文件，从中读取 game_package
+    if (!config_path.empty()) {
+        std::ifstream cfg(config_path);
+        if (cfg.is_open()) {
+            Json::Value root;
+            Json::CharReaderBuilder builder;
+            std::string errors;
+            if (Json::parseFromStream(builder, cfg, &root, &errors)) {
+                game_package_ = root.get("game_package", game_package_).asString();
+            }
+        }
+    }
+
     adb_client_ = std::make_unique<ADBClient>(adb_path);
 
     return adb_client_->connect(address.substr(0, address.find(':')), address.substr(address.find(':')+1));
@@ -33,17 +50,23 @@ bool SimpleController::capture_screenshot(const std::string& filename) {
     return adb_client_->capture_screenshot(device_address_, filename);
 }
 
+std::string SimpleController::auto_screenshot(const std::string& hint) {
+    int seq = screenshot_seq_.fetch_add(1);
+    auto now = std::chrono::system_clock::now();
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()).count() % 1000000;
+    std::string name = "_auto_" + hint + "_" + std::to_string(seq) + "_" + std::to_string(ms) + ".png";
+    if (capture_screenshot(name)) {
+        return name;
+    }
+    return "";
+}
+
 bool SimpleController::click(int x, int y) {
     if (!adb_client_) return false;
     std::string cmd = std::format("input tap {} {}", x, y);
     adb_client_->shell(device_address_, cmd);
     return true;
-}
-
-
-std::string SimpleController::build_cmd(const std::string& cmd) {
-    if (!adb_client_) return "";
-    return adb_client_->shell(device_address_, cmd);
 }
 
 bool SimpleController::swipe(int x1, int y1, int x2, int y2, int duration_ms) {
@@ -55,6 +78,26 @@ bool SimpleController::swipe(int x1, int y1, int x2, int y2, int duration_ms) {
 
 void SimpleController::wait(int ms) {
     std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+}
+
+bool SimpleController::start_app() {
+    if (!adb_client_) return false;
+    adb_client_->shell(device_address_, "am start -n " + game_package_);
+    return true;
+}
+
+bool SimpleController::stop_app() {
+    if (!adb_client_) return false;
+    // 提取包名（去掉 Activity 部分）
+    std::string pkg = game_package_.substr(0, game_package_.find('/'));
+    adb_client_->shell(device_address_, "am force-stop " + pkg);
+    return true;
+}
+
+void SimpleController::shell(const std::string& cmd) {
+    if (adb_client_) {
+        adb_client_->shell(device_address_, cmd);
+    }
 }
 
 bool SimpleController::detect_text(const std::string& image_path, std::string& out_text,

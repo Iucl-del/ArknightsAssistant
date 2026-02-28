@@ -5,35 +5,35 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.4.0] - 2026-02-27
+## [0.4.0] - 2026-02-28
 
 ### 新增
-- SDK 打包支持：项目功能模块编译为共享库（`libArknightsAutoBot.so`）+ 静态库（`libArknightsAutoBot.a`），供其他程序集成调用
-- CMake 包配置导出：下游项目可通过 `find_package(ArknightsAutoBot)` 直接使用，提供 `ArknightsAutoBot::ArknightsAutoBot_shared` / `ArknightsAutoBot::ArknightsAutoBot_static` 两个目标
-- 新增 `cmake/ArknightsAutoBotConfig.cmake.in` 模板，自动处理第三方依赖查找（OpenCV、jsoncpp）
-- SDK 安装规则打包第三方库（ONNX Runtime、OpenCV、jsoncpp 的 `.so` 文件），下游无需自行安装
-- ONNX Runtime 头文件随 SDK 一并安装至 `include/onnxruntime/`
-- 新增 `scripts/pack_sdk.sh`：一键构建 + CPack 打包 SDK 发布包
-- CPack 配置生成 `.tar.gz`（跨平台）和 `.deb`（Linux）格式的 SDK 包
+- **节点式任务系统**（借鉴 MAA pipeline 设计）
+  - 每个节点 = 识别 + 动作，执行器自动轮询截图直到识别通过再执行动作
+  - 识别类型：`DirectHit`（直接执行）、`OCR`（文字识别）、`TemplateMatch`（模板匹配）
+  - 动作类型：`Click`、`Swipe`、`StartApp`、`StopApp`
+  - 节点支持 `pre_delay` / `post_delay` 延迟控制
+  - 节点支持 `timeout` / `interval` 识别轮询控制
+- `SimpleController::auto_screenshot()`：自动生成唯一文件名并截图，视觉操作无需手动指定截图文件名
+- `SimpleController::start_app()` / `stop_app()`：启动/关闭游戏，包名通过配置文件或默认值内部管理
+- `SimpleController::shell()`：执行 ADB shell 命令
+- `SimpleController` 支持通过 `config_path` 加载 JSON 配置文件（读取 `game_package` 等参数）
 
 ### 变更
-- 可执行文件 `ArknightsAutoBot` 改为链接 SDK 共享库，不再直接编译所有源文件
-- 共享库与静态库的重复配置（include dirs、link libs、CUDA）合并为 `foreach()` 循环，消除冗余
-- 头文件安装从 4 条 `install()` 合并为 1 条 `install(DIRECTORY include/ ...)`
-- 第三方库 `.so` 收集逻辑抽取为 `install_imported_libs()` 辅助函数
-- 版本号统一使用 `project(VERSION)`，消除硬编码散落
-- FetchContent 调用统一为 `FetchContent_MakeAvailable()` 简化写法
-- `project()` 声明中新增 `VERSION 1.0.0`
+- **任务配置重构**：`TaskConfig` 从 `steps`（`BasicStep` / `VisionStep` / `SystemStep` 变体列表）重构为 `nodes`（`TaskNode` 顺序列表）
+- **ROI 统一**：删除 `ROIConfig`，直接复用 `vision_types.h` 中的 `ROI` 结构体
+- JSON 任务文件大幅简化
+  - 不再需要手动插入 `screenshot` / `wait` / `wait_until` 步骤
+  - 不再需要指定 `save_name` 截图文件名
+  - 不再需要 `next` 跳转和 `entry` 入口，节点按顺序执行
+  - 不再需要 `description` 字段，`name` 即可标识任务
+- 启动游戏参数（包名）隐藏在 `SimpleController` 内部，JSON 中 `StartApp` 无需任何参数
 
-### SDK 安装产物
-
-| 路径 | 内容 |
-|------|------|
-| `lib/` | `libArknightsAutoBot.so` / `.a` + ONNX Runtime / OpenCV / jsoncpp 动态库 |
-| `include/` | 项目公共头文件 + ONNX Runtime 头文件 |
-| `lib/cmake/ArknightsAutoBot/` | CMake Config / Targets / Version 文件 |
-| `share/ArknightsAutoBot/models/` | OCR 模型（`.onnx` + 字典） |
-| `share/ArknightsAutoBot/resource/` | 任务 JSON + 模板图片 |
+### 移除
+- 删除 `BasicStep` / `VisionStep` / `SystemStep` 类型及 `std::variant` 分发
+- 删除 `ROIConfig` 结构体
+- 删除 `TaskConfig::description` / `TaskConfig::entry` / `TaskNode::name` / `TaskNode::next` 字段
+- 删除 `SimpleController::build_cmd()` 方法
 
 ---
 

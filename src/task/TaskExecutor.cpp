@@ -1,7 +1,6 @@
 #include "task/TaskExecutor.hpp"
 #include <iostream>
 #include <chrono>
-#include <variant>
 
 TaskExecutor::TaskExecutor(SimpleController& controller) : controller_(controller) {}
 
@@ -26,10 +25,10 @@ void TaskExecutor::stop() {
     std::cout << "[TaskExecutor] ⏹️ 工作线程已停止" << std::endl;
 }
 
-void TaskExecutor::submit(const std::string& task_path,TaskCallback func) {
+void TaskExecutor::submit(const std::string& task_path, TaskCallback func) {
     {
         std::lock_guard<std::mutex> lock(queue_mutex_);
-        task_queue_.push(std::make_pair(task_path, func));
+        task_queue_.emplace(task_path, std::move(func));
         std::cout << "[TaskExecutor] 📥 任务已投递: " << task_path
                   << " (队列长度: " << task_queue_.size() << ")" << std::endl;
     }
@@ -47,7 +46,7 @@ bool TaskExecutor::is_running() const {
 
 void TaskExecutor::worker_loop() {
     while (running_.load()) {
-        std::pair<std::string,TaskCallback> task;
+        std::pair<std::string, TaskCallback> task;
         {
             std::unique_lock<std::mutex> lock(queue_mutex_);
             queue_cv_.wait(lock, [this] {
@@ -57,8 +56,7 @@ void TaskExecutor::worker_loop() {
             if (!running_.load() && task_queue_.empty()) break;
 
             if (!task_queue_.empty()) {
-                task = task_queue_.front();
-
+                task = std::move(task_queue_.front());
                 task_queue_.pop();
                 std::cout << "[TaskExecutor] 📤 取出任务: " << task.first
                           << " (剩余: " << task_queue_.size() << ")" << std::endl;
@@ -69,7 +67,7 @@ void TaskExecutor::worker_loop() {
             auto task_config = TaskLoader::load_from_file(task.first);
             if (!task_config.name.empty()) {
                 execute_task(task_config);
-                task.second();
+                if (task.second) task.second();
             } else {
                 std::cerr << "[TaskExecutor] ❌ 任务加载失败: " << task.first << std::endl;
             }
@@ -77,11 +75,14 @@ void TaskExecutor::worker_loop() {
     }
 }
 
+// ============================================================
+// 任务执行：顺序执行节点
+// ============================================================
+
 bool TaskExecutor::execute_task(const TaskConfig& task) {
     std::cout << "\n" << std::string(60, '=') << std::endl;
     std::cout << "[TaskExecutor] 🚀 开始执行任务: " << task.name << std::endl;
-    std::cout << "[TaskExecutor] 📋 " << task.description << std::endl;
-    std::cout << "[TaskExecutor] 📝 步骤总数: " << task.steps.size() << std::endl;
+    std::cout << "[TaskExecutor] 📝 节点总数: " << task.nodes.size() << std::endl;
     std::cout << std::string(60, '=') << std::endl;
 
     int loop_count = task.loop ? task.loop_count : 1;
@@ -91,26 +92,20 @@ bool TaskExecutor::execute_task(const TaskConfig& task) {
             std::cout << "\n[TaskExecutor] ━━━ 第 " << (i + 1) << "/" << loop_count << " 轮 ━━━" << std::endl;
         }
 
-        int step_index = 0;
-        for (const auto& step : task.steps) {
-            if (!running_.load()) {
-                std::cout << "[TaskExecutor] ⏹️ 任务被中断" << std::endl;
-                return false;
-            }
-
-            step_index++;
-            std::cout << "\n[Step " << step_index << "/" << task.steps.size() << "] ";
+        for (size_t idx = 0; idx < task.nodes.size() && running_.load(); ++idx) {
+            const auto& node = task.nodes[idx];
+            std::cout << "\n[Node " << (idx + 1) << "/" << task.nodes.size() << "]" << std::endl;
 
             auto start = std::chrono::steady_clock::now();
-            bool result = std::visit([this](const auto& s) { return execute(s); }, step);
+            bool result = execute_node(node);
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::steady_clock::now() - start);
 
             if (!result) {
-                std::cerr << "[Step " << step_index << "] ❌ 失败 (" << duration.count() << "ms)" << std::endl;
+                std::cerr << "[Node] ❌ 失败 (" << duration.count() << "ms)" << std::endl;
                 return false;
             }
-            std::cout << "[Step " << step_index << "] ✅ 完成 (" << duration.count() << "ms)" << std::endl;
+            std::cout << "[Node] ✅ 完成 (" << duration.count() << "ms)" << std::endl;
         }
     }
 
@@ -120,80 +115,153 @@ bool TaskExecutor::execute_task(const TaskConfig& task) {
     return true;
 }
 
-// ========== 静态多态：函数重载 ==========
+// ============================================================
+// 执行单个节点：识别轮询 → pre_delay → 动作 → post_delay
+// ============================================================
 
-bool TaskExecutor::execute(const BasicStep& step) {
-    if (step.action == "click") {
-        std::cout << "🖱️  点击 (" << step.x << ", " << step.y << ")" << std::endl;
-        return controller_.click(step.x, step.y);
-    } else if (step.action == "swipe") {
-        std::cout << "👆 滑动 (" << step.x << ", " << step.y << ") -> ("
-                  << step.x2 << ", " << step.y2 << ") " << step.duration << "ms" << std::endl;
-        return controller_.swipe(step.x, step.y, step.x2, step.y2, step.duration);
-    } else if (step.action == "wait") {
-        std::cout << "⏳ 等待 " << step.duration << "ms" << std::endl;
-        controller_.wait(step.duration);
-        return true;
+bool TaskExecutor::execute_node(const TaskNode& node) {
+    // 1. 识别阶段：轮询截图+识别，直到匹配或超时
+    std::string screenshot;
+
+    if (node.recognition == "DirectHit") {
+        // DirectHit 不需要识别，直接执行动作
+    } else {
+        std::cout << "  🔍 识别: " << node.recognition;
+        if (!node.expected.empty()) std::cout << " \"" << node.expected << "\"";
+        if (!node.template_path.empty()) std::cout << " [" << node.template_path << "]";
+        std::cout << " (超时: " << node.timeout << "ms)" << std::endl;
+
+        auto start = std::chrono::steady_clock::now();
+        bool found = false;
+        int attempt = 0;
+
+        while (running_.load()) {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start).count();
+            if (elapsed >= node.timeout) {
+                std::cerr << "  ⏰ 识别超时 (" << elapsed << "ms)" << std::endl;
+                return false;
+            }
+
+            attempt++;
+            found = recognize(node, screenshot);
+            if (found) {
+                std::cout << "  ✅ 识别成功 (第" << attempt << "次, "
+                          << std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 std::chrono::steady_clock::now() - start).count()
+                          << "ms)" << std::endl;
+                break;
+            }
+
+            controller_.wait(node.interval);
+        }
+
+        if (!found) return false;
     }
-    std::cerr << "❌ 未知操作: " << step.action << std::endl;
+
+    // 2. pre_delay
+    if (node.pre_delay > 0) {
+        std::cout << "  ⏳ pre_delay " << node.pre_delay << "ms" << std::endl;
+        controller_.wait(node.pre_delay);
+    }
+
+    // 3. 执行动作
+    if (!perform_action(node, screenshot)) {
+        return false;
+    }
+
+    // 4. post_delay
+    if (node.post_delay > 0) {
+        std::cout << "  ⏳ post_delay " << node.post_delay << "ms" << std::endl;
+        controller_.wait(node.post_delay);
+    }
+
+    return true;
+}
+
+// ============================================================
+// 识别：截图 + 检测
+// ============================================================
+
+bool TaskExecutor::recognize(const TaskNode& node, std::string& screenshot) {
+    screenshot = controller_.auto_screenshot(node.recognition);
+    if (screenshot.empty()) {
+        std::cerr << "  ❌ 截图失败" << std::endl;
+        return false;
+    }
+
+    if (node.recognition == "OCR") {
+        if (node.roi.has_value()) {
+            std::string text;
+            if (!controller_.detect_text(screenshot, text, node.roi.value())) return false;
+            return text.find(node.expected) != std::string::npos;
+        } else {
+            int x, y;
+            return controller_.find_text(screenshot, node.expected, x, y);
+        }
+    } else if (node.recognition == "TemplateMatch") {
+        int x, y;
+        return controller_.find_template(screenshot, node.template_path, x, y);
+    }
+
+    std::cerr << "  ❌ 未知识别方式: " << node.recognition << std::endl;
     return false;
 }
 
-bool TaskExecutor::execute(const VisionStep& step) {
-    if (step.action == "ocr_click") {
-        std::cout << "🔍🖱️  OCR点击: \"" << step.text << "\"" << std::endl;
-        int x, y;
-        if (controller_.find_text(step.image_name, step.text, x, y)) {
-            std::cout << "  ✅ 位置: (" << x << ", " << y << ")" << std::endl;
+// ============================================================
+// 动作执行
+// ============================================================
+
+bool TaskExecutor::perform_action(const TaskNode& node, const std::string& screenshot) {
+    if (node.action == "Click") {
+        if (!node.target.empty() && node.target.size() >= 2) {
+            // 使用指定坐标
+            int x = node.target[0], y = node.target[1];
+            std::cout << "  🖱️  点击 (" << x << ", " << y << ")" << std::endl;
             return controller_.click(x, y);
-        }
-        std::cerr << "  ❌ 未找到: \"" << step.text << "\"" << std::endl;
-        return false;
-    } else if (step.action == "ocr_region") {
-        if (!step.roi.has_value()) {
-            std::cerr << "❌ ocr_region 需要配置 roi" << std::endl;
+        } else if (!node.expected.empty() && !screenshot.empty()) {
+            // OCR 识别位置点击
+            int x, y;
+            if (controller_.find_text(screenshot, node.expected, x, y)) {
+                std::cout << "  🖱️  OCR点击 \"" << node.expected << "\" (" << x << ", " << y << ")" << std::endl;
+                return controller_.click(x, y);
+            }
+            std::cerr << "  ❌ 未找到点击位置" << std::endl;
+            return false;
+        } else if (!node.template_path.empty() && !screenshot.empty()) {
+            // 模板匹配位置点击
+            int x, y;
+            if (controller_.find_template(screenshot, node.template_path, x, y)) {
+                std::cout << "  🖱️  模板点击 (" << x << ", " << y << ")" << std::endl;
+                return controller_.click(x, y);
+            }
+            std::cerr << "  ❌ 未找到点击位置" << std::endl;
             return false;
         }
-        const auto& r = step.roi.value();
-        std::cout << "🔍📐 OCR区域 (" << r.x << ", " << r.y << ", "
-                  << r.width << "x" << r.height << ")" << std::endl;
-        std::string text;
-        ROI roi{r.x, r.y, r.width, r.height, r.base_width, r.base_height};
-        if (controller_.detect_text(step.image_name, text, roi)) {
-            std::cout << "  📝 结果: \"" << text << "\"" << std::endl;
-            if (!step.text.empty()) {
-                return text.find(step.text) != std::string::npos;
-            }
-            return true;
-        }
+        std::cerr << "  ❌ Click 缺少 target 或识别结果" << std::endl;
         return false;
-    } else if (step.action == "template") {
-        std::cout << "🖼️  模板匹配: " << step.template_path << std::endl;
-        int x, y;
-        if (controller_.find_template(step.image_name, step.template_path, x, y)) {
-            std::cout << "  ✅ 位置: (" << x << ", " << y << ")" << std::endl;
-            return controller_.click(x, y);
+    } else if (node.action == "Swipe") {
+        if (node.target.size() >= 5) {
+            int x1 = node.target[0], y1 = node.target[1];
+            int x2 = node.target[2], y2 = node.target[3];
+            int dur = node.target[4];
+            std::cout << "  👆 滑动 (" << x1 << "," << y1 << ") -> (" << x2 << "," << y2 << ") " << dur << "ms" << std::endl;
+            return controller_.swipe(x1, y1, x2, y2, dur);
         }
-        std::cerr << "  ❌ 匹配失败" << std::endl;
+        std::cerr << "  ❌ Swipe 需要 target: [x1,y1,x2,y2,duration]" << std::endl;
         return false;
+    } else if (node.action == "Shell") {
+        std::cout << "  💻 Shell: " << node.shell_cmd << std::endl;
+        controller_.shell(node.shell_cmd);
+        return true;
+    } else if (node.action == "StartApp") {
+        std::cout << "  📱 启动游戏" << std::endl;
+        return controller_.start_app();
+    } else if (node.action == "StopApp") {
+        std::cout << "  📱 关闭游戏" << std::endl;
+        return controller_.stop_app();
     }
-    std::cerr << "❌ 未知操作: " << step.action << std::endl;
-    return false;
-}
 
-bool TaskExecutor::execute(const SystemStep& step) {
-    if (step.action == "screenshot") {
-        std::cout << "📷 截图 -> " << step.image_name << std::endl;
-        return controller_.capture_screenshot(step.image_name);
-    } else if (step.action == "shell") {
-        std::cout << "💻 Shell: " << step.cmd << std::endl;
-        controller_.build_cmd(step.cmd);
-        return true;
-    } else if (step.action == "start_app") {
-        std::cout << "📱 启动: " << step.package_name << std::endl;
-        controller_.build_cmd("am start -n " + step.package_name);
-        return true;
-    }
-    std::cerr << "❌ 未知操作: " << step.action << std::endl;
+    std::cerr << "  ❌ 未知动作: " << node.action << std::endl;
     return false;
 }

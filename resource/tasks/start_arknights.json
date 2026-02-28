@@ -1,33 +1,23 @@
 {
-  "name": "start_arknights",
-  "description": "启动明日方舟游戏",
-  "loop": false,
-  "steps": [
+  "name": "启动明日方舟",
+  "nodes": [
     {
-      "action": "shell",
-      "shell_cmd": "am start -n com.hypergryph.arknights/com.u8.sdk.U8UnityContext"
+      "recognition": "DirectHit",
+      "action": "StartApp",
+      "post_delay": 10000
     },
     {
-      "action": "wait",
-      "duration": 10000
+      "recognition": "DirectHit",
+      "action": "Click",
+      "target": [960, 540],
+      "post_delay": 500
     },
     {
-      "action": "click",
-      "x": 960,
-      "y": 540
-    },
-    {
-      "action": "wait",
-      "duration": 8000
-    },
-    {
-      "action": "screenshot",
-      "save_name": "start_screen.png"
-    },
-    {
-      "action": "ocr_click",
-      "save_name": "start_screen.png",
-      "text": "开始唤醒"
+      "recognition": "OCR",
+      "expected": "开始唤醒",
+      "action": "Click",
+      "timeout": 20000,
+      "interval": 2000
     }
   ]
 }

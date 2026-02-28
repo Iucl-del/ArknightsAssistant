@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <atomic>
 #include "adb/ADBClient.hpp"
 #include "vision/ocr_pack.h"
 #include "vision/vision_types.h"
@@ -20,8 +21,13 @@ public:
     bool capture_screenshot(const std::string& filename);
     bool click(int x, int y);
     void wait(int ms);
-    std::string build_cmd(const std::string& cmd);
     bool swipe(int x1, int y1, int x2, int y2, int duration_ms);
+    bool start_app();
+    bool stop_app();
+    void shell(const std::string& cmd);
+
+    // 自动截图：生成唯一文件名并截图，返回文件名；失败返回空串
+    std::string auto_screenshot(const std::string& hint = "auto");
 
     // 视觉功能：不传 roi 则识别整张图，传入 roi 则只识别指定区域
     bool detect_text(const std::string& image_path, std::string& out_text,
@@ -35,5 +41,7 @@ private:
     std::string device_address_;
     std::string adb_path_;
     std::string config_path_;
-    std::string work_dir_;  // ADB 工作目录
+    std::string work_dir_;          // ADB 工作目录
+    std::string game_package_;      // 游戏包名/Activity
+    std::atomic<int> screenshot_seq_{0};
 };
