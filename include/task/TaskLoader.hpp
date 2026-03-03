@@ -45,21 +45,59 @@ private:
 
                 // 识别
                 node.recognition = n.get("recognition", "DirectHit").asString();
+                node.method = n.get("method", "Ccoeff").asString();
                 node.expected = n.get("expected", "").asString();
-                node.template_path = n.get("template", "").asString();
+                if (n.isMember("template")) {
+                    const auto& t = n["template"];
+                    if (t.isArray()) {
+                        for (const auto& v : t) {
+                            node.template_paths.push_back(v.asString());
+                        }
+                    } else {
+                        node.template_paths.push_back(t.asString());
+                    }
+                }
+                node.threshold = n.get("threshold", 0.8).asDouble();
                 node.timeout = n.get("timeout", 20000).asInt();
                 node.interval = n.get("interval", 1000).asInt();
 
+                // ROI: [x, y, w, h] 或 [x, y, w, h, base_w, base_h]
                 if (n.isMember("roi")) {
                     const auto& r = n["roi"];
-                    ROI roi;
-                    roi.x = r["x"].asInt();
-                    roi.y = r["y"].asInt();
-                    roi.w = r["w"].asInt();
-                    roi.h = r["h"].asInt();
-                    roi.base_w = r.get("base_w", 1280).asInt();
-                    roi.base_h = r.get("base_h", 720).asInt();
-                    node.roi = roi;
+                    if (r.isArray() && r.size() >= 4) {
+                        ROI roi;
+                        roi.x = r[0].asInt();
+                        roi.y = r[1].asInt();
+                        roi.w = r[2].asInt();
+                        roi.h = r[3].asInt();
+                        roi.base_w = r.size() > 4 ? r[4].asInt() : 1280;
+                        roi.base_h = r.size() > 5 ? r[5].asInt() : 720;
+                        node.roi = roi;
+                    }
+                }
+
+                // color_scales: 单个 [l0,l1,l2,u0,u1,u2] 或多个 [[...],[...]]
+                if (n.isMember("color_scales")) {
+                    const auto& cs = n["color_scales"];
+                    if (cs.isArray() && !cs.empty()) {
+                        if (cs[0].isArray()) {
+                            // 多组: [[l0,l1,l2,u0,u1,u2], ...]
+                            for (const auto& range : cs) {
+                                if (range.size() >= 6) {
+                                    ColorRange cr;
+                                    for (int i = 0; i < 3; ++i) cr.lower[i] = range[i].asInt();
+                                    for (int i = 0; i < 3; ++i) cr.upper[i] = range[3 + i].asInt();
+                                    node.color_scales.push_back(cr);
+                                }
+                            }
+                        } else if (cs.size() >= 6) {
+                            // 单组: [l0,l1,l2,u0,u1,u2]
+                            ColorRange cr;
+                            for (int i = 0; i < 3; ++i) cr.lower[i] = cs[i].asInt();
+                            for (int i = 0; i < 3; ++i) cr.upper[i] = cs[3 + i].asInt();
+                            node.color_scales.push_back(cr);
+                        }
+                    }
                 }
 
                 // 动作
@@ -73,6 +111,9 @@ private:
                 // 延迟
                 node.pre_delay = n.get("pre_delay", 0).asInt();
                 node.post_delay = n.get("post_delay", 500).asInt();
+
+                // 失败策略
+                node.repeat_until_failed = n.get("repeat_until_failed", false).asBool();
 
                 config.nodes.emplace_back(std::move(node));
             }

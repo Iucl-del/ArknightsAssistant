@@ -6,6 +6,8 @@
 #include <vector>
 #include "ocr_det.h"
 #include "ocr_rec.h"
+#include "image_preprocessor.h"
+#include "vision_types.h"
 
 /**
  * @brief 旋转裁剪图像，用于提取检测到的文本区域
@@ -52,6 +54,19 @@ public:
      * @return 检测到的文本框列表
      */
     std::vector<TextBox> detectTextRegions(const cv::Mat& img);
+
+    /**
+     * @brief 模板匹配（支持预处理策略）
+     * @param scene 场景图像（截图）
+     * @param templ 模板图像
+     * @param strategy 预处理策略，对 scene 和 templ 同时预处理后再匹配
+     * @param threshold 匹配阈值 (0.0~1.0)
+     * @param out_pos 匹配成功时输出匹配中心坐标
+     * @return 是否匹配成功（最大匹配值 >= threshold）
+     */
+    bool findTemplate(const cv::Mat& scene, const cv::Mat& templ,
+                      ImagePreprocessor::Strategy strategy,
+                      double threshold, cv::Point& out_pos);
 
 private:
     std::unique_ptr<Ort::Env> env_;           ///< ONNX Runtime环境

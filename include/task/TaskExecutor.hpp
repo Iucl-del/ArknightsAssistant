@@ -28,8 +28,8 @@ private:
     // 执行单个节点：识别轮询 → 动作 → 返回是否成功
     bool execute_node(const TaskNode& node);
 
-    // 识别：自动截图 + 检测，返回是否匹配成功
-    bool recognize(const TaskNode& node, std::string& screenshot);
+    // 识别：对已有截图执行检测，返回是否匹配成功
+    bool recognize(const TaskNode& node, const std::string& screenshot);
 
     // 动作：根据 action 类型执行
     bool perform_action(const TaskNode& node, const std::string& screenshot);

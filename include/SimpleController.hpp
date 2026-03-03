@@ -7,6 +7,8 @@
 #include "adb/ADBClient.hpp"
 #include "vision/ocr_pack.h"
 #include "vision/vision_types.h"
+#include "vision/image_preprocessor.h"
+#include "task/TaskConfig.hpp"
 
 class SimpleController {
 public:
@@ -32,8 +34,14 @@ public:
     // 视觉功能：不传 roi 则识别整张图，传入 roi 则只识别指定区域
     bool detect_text(const std::string& image_path, std::string& out_text,
                      std::optional<ROI> roi = std::nullopt);
-    bool find_template(const std::string& image_path, const std::string& template_path, cv::Point& out_pos);
     bool find_text(const std::string& image_path, const std::string& target_text, cv::Point& out_pos);
+
+    // 模板匹配（支持多模板轮询，预处理策略由 ImagePreprocessor::Strategy 指定）
+    bool find_template_with_preprocess(const std::string& image_path,
+                                       const std::vector<std::string>& template_paths,
+                                       ImagePreprocessor::Strategy strategy,
+                                       double threshold,
+                                       cv::Point& out_pos);
 
 private:
     std::unique_ptr<ADBClient> adb_client_;

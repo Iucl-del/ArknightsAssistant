@@ -79,3 +79,38 @@ std::string OcrPack::recognizeText(const cv::Mat& img) {
 std::vector<TextBox> OcrPack::detectTextRegions(const cv::Mat& img) {
     return detector_->detect(img);
 }
+
+bool OcrPack::findTemplate(const cv::Mat& scene, const cv::Mat& templ,
+                           ImagePreprocessor::Strategy strategy,
+                           double threshold, cv::Point& out_pos) {
+    if (scene.empty() || templ.empty()) return false;
+    if (templ.rows > scene.rows || templ.cols > scene.cols) return false;
+
+    // 使用 ImagePreprocessor 对场景图和模板图做相同的预处理
+    cv::Mat proc_scene = ImagePreprocessor::process(scene, strategy);
+    cv::Mat proc_templ = ImagePreprocessor::process(templ, strategy);
+
+    // 预处理后可能变为单通道，需要保证两者通道数一致
+    if (proc_scene.channels() != proc_templ.channels()) {
+        if (proc_scene.channels() == 1)
+            cv::cvtColor(proc_scene, proc_scene, cv::COLOR_GRAY2BGR);
+        if (proc_templ.channels() == 1)
+            cv::cvtColor(proc_templ, proc_templ, cv::COLOR_GRAY2BGR);
+    }
+
+    cv::Mat result;
+    cv::matchTemplate(proc_scene, proc_templ, result, cv::TM_CCOEFF_NORMED);
+
+    double max_val;
+    cv::Point max_loc;
+    cv::minMaxLoc(result, nullptr, &max_val, nullptr, &max_loc);
+
+    if (max_val >= threshold) {
+        // 返回匹配区域的中心坐标（相对于原始 scene）
+        out_pos.x = max_loc.x + templ.cols / 2;
+        out_pos.y = max_loc.y + templ.rows / 2;
+        return true;
+    }
+    return false;
+}
+

@@ -1,6 +1,18 @@
 #include "task/TaskExecutor.hpp"
+#include "vision/image_preprocessor.h"
 #include <iostream>
 #include <chrono>
+
+namespace {
+    // 将任务配置中的 method 字符串映射到 ImagePreprocessor::Strategy
+    ImagePreprocessor::Strategy methodToStrategy(const std::string& method) {
+        if (method == "Grayscale")  return ImagePreprocessor::Strategy::GRAYSCALE;
+        if (method == "HSVCount")   return ImagePreprocessor::Strategy::ENHANCE_CONTRAST;
+        if (method == "RGBCount")   return ImagePreprocessor::Strategy::ENHANCE_CONTRAST;
+        // Ccoeff 及其他 — 不做预处理，直接彩色匹配
+        return ImagePreprocessor::Strategy::NONE;
+    }
+}
 
 TaskExecutor::TaskExecutor(SimpleController& controller) : controller_(controller) {}
 
@@ -109,6 +121,7 @@ bool TaskExecutor::execute_task(const TaskConfig& task) {
         }
     }
 
+
     std::cout << "\n" << std::string(60, '=') << std::endl;
     std::cout << "[TaskExecutor] ✅ 任务完成: " << task.name << std::endl;
     std::cout << std::string(60, '=') << "\n" << std::endl;
@@ -120,88 +133,115 @@ bool TaskExecutor::execute_task(const TaskConfig& task) {
 // ============================================================
 
 bool TaskExecutor::execute_node(const TaskNode& node) {
-    // 1. 识别阶段：轮询截图+识别，直到匹配或超时
-    std::string screenshot;
+    int round = 0;
 
-    if (node.recognition == "DirectHit") {
-        // DirectHit 不需要识别，直接执行动作
-    } else {
-        std::cout << "  🔍 识别: " << node.recognition;
-        if (!node.expected.empty()) std::cout << " \"" << node.expected << "\"";
-        if (!node.template_path.empty()) std::cout << " [" << node.template_path << "]";
-        std::cout << " (超时: " << node.timeout << "ms)" << std::endl;
+    do {
+        std::string screenshot;
 
-        auto start = std::chrono::steady_clock::now();
-        bool found = false;
-        int attempt = 0;
+        if (node.recognition == "DirectHit") {
+            // DirectHit 不需要识别
+        } else {
+            if (node.repeat_until_failed && round > 0) {
+                std::cout << "  🔁 repeat_until_failed 第" << (round + 1) << "轮" << std::endl;
+            }
+            std::cout << "  🔍 识别: " << node.recognition << " [" << node.method << "]";
+            if (!node.expected.empty()) std::cout << " \"" << node.expected << "\"";
+            if (!node.template_paths.empty()) {
+                std::cout << " [";
+                for (size_t i = 0; i < node.template_paths.size(); ++i) {
+                    if (i > 0) std::cout << ", ";
+                    std::cout << node.template_paths[i];
+                }
+                std::cout << "]";
+            }
+            std::cout << " (超时: " << node.timeout << "ms)" << std::endl;
 
-        while (running_.load()) {
-            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now() - start).count();
-            if (elapsed >= node.timeout) {
-                std::cerr << "  ⏰ 识别超时 (" << elapsed << "ms)" << std::endl;
+            auto start = std::chrono::steady_clock::now();
+            bool found = false;
+            int attempt = 0;
+
+            while (running_.load()) {
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - start).count();
+                if (elapsed >= node.timeout) {
+                    if (node.repeat_until_failed) {
+                        std::cout << "  ✅ repeat_until_failed 结束 (共执行" << round << "轮)" << std::endl;
+                        return true;
+                    }
+                    std::cerr << "  ⏰ 识别超时 (" << elapsed << "ms)" << std::endl;
+                    return false;
+                }
+
+                attempt++;
+                screenshot = controller_.auto_screenshot(node.recognition);
+                if (screenshot.empty()) {
+                    std::cerr << "  ❌ 截图失败" << std::endl;
+                    return false;
+                }
+
+                found = recognize(node, screenshot);
+                if (found) {
+                    std::cout << "  ✅ 识别成功 (第" << attempt << "次, "
+                              << std::chrono::duration_cast<std::chrono::milliseconds>(
+                                     std::chrono::steady_clock::now() - start).count()
+                              << "ms)" << std::endl;
+                    break;
+                }
+
+                controller_.wait(node.interval);
+            }
+
+            if (!found) {
+                if (node.repeat_until_failed) {
+                    std::cout << "  ✅ repeat_until_failed 结束 (共执行" << round << "轮)" << std::endl;
+                    return true;
+                }
                 return false;
             }
-
-            attempt++;
-            found = recognize(node, screenshot);
-            if (found) {
-                std::cout << "  ✅ 识别成功 (第" << attempt << "次, "
-                          << std::chrono::duration_cast<std::chrono::milliseconds>(
-                                 std::chrono::steady_clock::now() - start).count()
-                          << "ms)" << std::endl;
-                break;
-            }
-
-            controller_.wait(node.interval);
         }
 
-        if (!found) return false;
-    }
+        // pre_delay
+        if (node.pre_delay > 0) {
+            std::cout << "  ⏳ pre_delay " << node.pre_delay << "ms" << std::endl;
+            controller_.wait(node.pre_delay);
+        }
 
-    // 2. pre_delay
-    if (node.pre_delay > 0) {
-        std::cout << "  ⏳ pre_delay " << node.pre_delay << "ms" << std::endl;
-        controller_.wait(node.pre_delay);
-    }
+        // 执行动作
+        if (!perform_action(node, screenshot)) {
+            return false;
+        }
 
-    // 3. 执行动作
-    if (!perform_action(node, screenshot)) {
-        return false;
-    }
+        // post_delay
+        if (node.post_delay > 0) {
+            std::cout << "  ⏳ post_delay " << node.post_delay << "ms" << std::endl;
+            controller_.wait(node.post_delay);
+        }
 
-    // 4. post_delay
-    if (node.post_delay > 0) {
-        std::cout << "  ⏳ post_delay " << node.post_delay << "ms" << std::endl;
-        controller_.wait(node.post_delay);
-    }
+        round++;
+    } while (node.repeat_until_failed && running_.load());
 
     return true;
 }
 
 // ============================================================
-// 识别：截图 + 检测
+// 识别：根据 recognition + method 分发
 // ============================================================
 
-bool TaskExecutor::recognize(const TaskNode& node, std::string& screenshot) {
-    screenshot = controller_.auto_screenshot(node.recognition);
-    if (screenshot.empty()) {
-        std::cerr << "  ❌ 截图失败" << std::endl;
-        return false;
-    }
-
+bool TaskExecutor::recognize(const TaskNode& node, const std::string& screenshot) {
     if (node.recognition == "OCR") {
         if (node.roi.has_value()) {
             std::string text;
             if (!controller_.detect_text(screenshot, text, node.roi.value())) return false;
             return text.find(node.expected) != std::string::npos;
         } else {
-            int x, y;
-            return controller_.find_text(screenshot, node.expected, x, y);
+            cv::Point pos;
+            return controller_.find_text(screenshot, node.expected, pos);
         }
     } else if (node.recognition == "TemplateMatch") {
-        int x, y;
-        return controller_.find_template(screenshot, node.template_path, x, y);
+        cv::Point pos;
+        auto strategy = methodToStrategy(node.method);
+        return controller_.find_template_with_preprocess(screenshot, node.template_paths,
+                                                          strategy, node.threshold, pos);
     }
 
     std::cerr << "  ❌ 未知识别方式: " << node.recognition << std::endl;
@@ -215,25 +255,25 @@ bool TaskExecutor::recognize(const TaskNode& node, std::string& screenshot) {
 bool TaskExecutor::perform_action(const TaskNode& node, const std::string& screenshot) {
     if (node.action == "Click") {
         if (!node.target.empty() && node.target.size() >= 2) {
-            // 使用指定坐标
-            int x = node.target[0], y = node.target[1];
-            std::cout << "  🖱️  点击 (" << x << ", " << y << ")" << std::endl;
-            return controller_.click(x, y);
+            cv::Point pos(node.target[0], node.target[1]);
+            std::cout << "  🖱️  点击 (" << pos.x << ", " << pos.y << ")" << std::endl;
+            return controller_.click(pos);
         } else if (!node.expected.empty() && !screenshot.empty()) {
-            // OCR 识别位置点击
-            int x, y;
-            if (controller_.find_text(screenshot, node.expected, x, y)) {
-                std::cout << "  🖱️  OCR点击 \"" << node.expected << "\" (" << x << ", " << y << ")" << std::endl;
-                return controller_.click(x, y);
+            cv::Point pos;
+            if (controller_.find_text(screenshot, node.expected, pos)) {
+                std::cout << "  🖱️  OCR点击 \"" << node.expected << "\" (" << pos.x << ", " << pos.y << ")" << std::endl;
+                return controller_.click(pos);
             }
             std::cerr << "  ❌ 未找到点击位置" << std::endl;
             return false;
-        } else if (!node.template_path.empty() && !screenshot.empty()) {
-            // 模板匹配位置点击
-            int x, y;
-            if (controller_.find_template(screenshot, node.template_path, x, y)) {
-                std::cout << "  🖱️  模板点击 (" << x << ", " << y << ")" << std::endl;
-                return controller_.click(x, y);
+        } else if (!node.template_paths.empty() && !screenshot.empty()) {
+            cv::Point pos;
+            auto strategy = methodToStrategy(node.method);
+            bool found = controller_.find_template_with_preprocess(screenshot, node.template_paths,
+                                                                    strategy, node.threshold, pos);
+            if (found) {
+                std::cout << "  🖱️  模板点击 (" << pos.x << ", " << pos.y << ")" << std::endl;
+                return controller_.click(pos);
             }
             std::cerr << "  ❌ 未找到点击位置" << std::endl;
             return false;
@@ -242,11 +282,11 @@ bool TaskExecutor::perform_action(const TaskNode& node, const std::string& scree
         return false;
     } else if (node.action == "Swipe") {
         if (node.target.size() >= 5) {
-            int x1 = node.target[0], y1 = node.target[1];
-            int x2 = node.target[2], y2 = node.target[3];
+            cv::Point from(node.target[0], node.target[1]);
+            cv::Point to(node.target[2], node.target[3]);
             int dur = node.target[4];
-            std::cout << "  👆 滑动 (" << x1 << "," << y1 << ") -> (" << x2 << "," << y2 << ") " << dur << "ms" << std::endl;
-            return controller_.swipe(x1, y1, x2, y2, dur);
+            std::cout << "  👆 滑动 (" << from.x << "," << from.y << ") -> (" << to.x << "," << to.y << ") " << dur << "ms" << std::endl;
+            return controller_.swipe(from, to, dur);
         }
         std::cerr << "  ❌ Swipe 需要 target: [x1,y1,x2,y2,duration]" << std::endl;
         return false;

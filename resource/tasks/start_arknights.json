@@ -4,28 +4,29 @@
     {
       "recognition": "DirectHit",
       "action": "StartApp",
-      "post_delay": 10000
+      "post_delay": 7000
     },
     {
       "recognition": "TemplateMatch",
+      "method": "Ccoeff",
       "template": "resource/templates/START.png",
-      "action": "Click",
-      "timeout": 20000,
-      "interval": 2000
+      "action": "Click"
     },
     {
       "recognition": "OCR",
       "expected": "开始唤醒",
-      "action": "Click",
-      "timeout": 20000,
-      "interval": 2000
+      "action": "Click"
     },
     {
       "recognition": "TemplateMatch",
-      "template": "resource/templates/close_announcement.png",
+      "method": "Grayscale",
+      "template": [
+        "resource/templates/OfflineCancel.png"
+      ],
+      "threshold": 0.7,
       "action": "Click",
       "timeout": 20000,
-      "interval": 2000
+      "repeat_until_failed": true
     }
   ]
 }

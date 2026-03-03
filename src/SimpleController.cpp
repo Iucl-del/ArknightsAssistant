@@ -1,5 +1,6 @@
 #include "SimpleController.hpp"
 #include "Config.hpp"
+#include "vision/image_preprocessor.h"
 #include <thread>
 #include <chrono>
 #include <format>
@@ -109,28 +110,6 @@ bool SimpleController::detect_text(const std::string& image_path, std::string& o
     return !out_text.empty();
 }
 
-bool SimpleController::find_template(const std::string& image_path, const std::string& template_path, cv::Point& out_pos) {
-    std::string full_image_path = work_dir_ + "/" + image_path;
-    std::string full_template_path = std::string(Config::PROJECT_ROOT_DIR) + "/" + template_path;
-    cv::Mat img = cv::imread(full_image_path);
-    cv::Mat templ = cv::imread(full_template_path);
-    if (img.empty() || templ.empty()) return false;
-
-    cv::Mat result;
-    cv::matchTemplate(img, templ, result, cv::TM_CCOEFF_NORMED);
-
-    double minVal, maxVal;
-    cv::Point minLoc, maxLoc;
-    cv::minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc);
-
-    if (maxVal > 0.8) {
-        out_pos.x = maxLoc.x + templ.cols / 2;
-        out_pos.y = maxLoc.y + templ.rows / 2;
-        return true;
-    }
-    return false;
-}
-
 bool SimpleController::find_text(const std::string& image_path, const std::string& target_text, cv::Point& out_pos) {
     if (!vision_api_) return false;
     std::string full_path = work_dir_ + "/" + image_path;
@@ -153,5 +132,26 @@ bool SimpleController::find_text(const std::string& image_path, const std::strin
     return false;
 }
 
+bool SimpleController::find_template_with_preprocess(const std::string& image_path,
+                                                      const std::vector<std::string>& template_paths,
+                                                      ImagePreprocessor::Strategy strategy,
+                                                      double threshold,
+                                                      cv::Point& out_pos) {
+    if (!vision_api_) return false;
 
+    std::string full_path = work_dir_ + "/" + image_path;
+    cv::Mat scene = cv::imread(full_path);
+    if (scene.empty()) return false;
 
+    // 轮询匹配多个模板，任一匹配即返回成功
+    for (const auto& tpl_path : template_paths) {
+        std::string tpl_full = work_dir_ + "/" + tpl_path;
+        cv::Mat templ = cv::imread(tpl_full);
+        if (templ.empty()) continue;
+
+        if (vision_api_->findTemplate(scene, templ, strategy, threshold, out_pos)) {
+            return true;
+        }
+    }
+    return false;
+}
