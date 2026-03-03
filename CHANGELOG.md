@@ -5,6 +5,40 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.0] - 2026-03-03
+
+### 新增
+- **`OcrPack::findTemplate` 模板匹配方法**
+  - 接受 `ImagePreprocessor::Strategy` 参数，对场景图和模板图做相同预处理后执行 `TM_CCOEFF_NORMED` 匹配
+  - 自动处理预处理后通道数不一致的情况
+- **`SimpleController::find_template_with_preprocess`**
+  - 支持多模板轮询匹配，任一模板匹配成功即返回
+  - 预处理策略通过 `ImagePreprocessor::Strategy` 枚举指定
+- **`TaskNode` 新增字段**
+  - `method`：识别算法选择（`Ccoeff` / `Grayscale` / `HSVCount` / `RGBCount`）
+  - `template_paths`：支持多个模板图路径（替代原 `template_path` 单路径）
+  - `threshold`：可配置匹配阈值（默认 0.8）
+  - `color_scales`：颜色范围配置（`ColorRange` 结构体）
+  - `repeat_until_failed`：反复执行直到识别失败，适用于关闭多个弹窗
+- **`TaskLoader` 解析增强**
+  - `template` 字段支持字符串或数组两种格式
+  - `roi` 字段支持数组格式 `[x, y, w, h]` 或 `[x, y, w, h, base_w, base_h]`
+  - 新增 `color_scales`、`threshold`、`method`、`repeat_until_failed` 字段解析
+- 新增模板图片资源：`START.png`、`OfflineCancel.png`、`OfflineConfirm.png`、`PopupCancel.png`、`PopupConfirm.png`、`bell_infrastructure.png`
+
+### 变更
+- **`TaskExecutor` 统一模板匹配调用**
+  - 删除原 `find_template_ccoeff` / `find_template_grayscale` / `find_template_hsv` / `find_template_rgb` 分散接口
+  - `recognize` 和 `perform_action` 统一通过 `find_template_with_preprocess` + `methodToStrategy` 分发
+- **`execute_node` 重构**
+  - 截图逻辑从 `recognize` 移至 `execute_node`，截图失败立即返回错误
+  - 新增 `repeat_until_failed` 循环执行逻辑
+- 删除旧的 `SimpleController::find_template` 单模板匹配方法
+- 模板图片路径使用 `Config::PROJECT_ROOT_DIR` 拼接（修复 `work_dir_` 路径错误）
+- `start_arknights.json` 更新：新增 `method` 字段、模板改用数组格式、关闭弹窗节点启用 `repeat_until_failed`
+
+---
+
 ## [0.5.0] - 2026-03-03
 
 ### 新增

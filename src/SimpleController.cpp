@@ -145,7 +145,7 @@ bool SimpleController::find_template_with_preprocess(const std::string& image_pa
 
     // 轮询匹配多个模板，任一匹配即返回成功
     for (const auto& tpl_path : template_paths) {
-        std::string tpl_full = work_dir_ + "/" + tpl_path;
+        std::string tpl_full = std::string(Config::PROJECT_ROOT_DIR) + "/" + tpl_path;
         cv::Mat templ = cv::imread(tpl_full);
         if (templ.empty()) continue;
 
