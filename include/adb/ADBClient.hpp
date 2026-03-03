@@ -3,7 +3,11 @@
 #include "AdbStatus.hpp"
 #include <deque>
 #include <map>
-#include <asio.hpp>
+#include <vector>
+#include <boost/asio.hpp>
+
+namespace net = boost::asio;
+using tcp = net::ip::tcp;
 
 // ADB 客户端，Socket 直连 ADB Server，支持常用设备管理与文件操作
 class ADBClient {
@@ -21,14 +25,13 @@ public:
     bool push(std::string_view device_id, std::string_view local_path, std::string_view remote_path);
 
 private:
-    // 连接到 ADB Server
-    asio::ip::tcp::socket connect_to_server(std::string_view host = "127.0.0.1", std::string_view port = "5037");
-    // 发送 ADB 协议命令
+    tcp::socket connect_to_server(std::string_view host = "127.0.0.1", std::string_view port = "5037");
     std::string send_command(std::string_view command, std::string_view host = "127.0.0.1", std::string_view port = "5037");
-    // 选择设备并发送命令
     std::string send_device_command(std::string_view device_id, std::string_view command, std::string_view host = "127.0.0.1", std::string_view port = "5037");
 
-    asio::io_context io_context_;        // ASIO IO上下文
-    asio::ip::tcp::resolver resolver_;   // TCP解析器
-    std::string work_dir_; // ADB工作目录
+    net::io_context io_context_;
+    tcp::resolver resolver_;
+    std::string work_dir_;
+    bool work_dir_created_;
+    std::vector<std::string> screenshot_paths_;
 };

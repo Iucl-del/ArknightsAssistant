@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.30)
 project(ArknightsAutoBot)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -7,9 +7,6 @@ set(PROJECT_ROOT_DIR "${CMAKE_SOURCE_DIR}")
 option(ORT_WITH_CUDA "使用带 CUDA 支持的 ONNX Runtime 预构建版本" OFF)
 
 include(FetchContent)
-if(POLICY CMP0169)
-    cmake_policy(SET CMP0169 OLD)
-endif()
 
 # ============================================================
 # ONNX Runtime — 本地优先，否则按平台自动下载
@@ -43,11 +40,9 @@ else()
     set(_ORT_PKG "onnxruntime-${_ORT_PLATFORM}${_ORT_SUFFIX}-${ONNXRUNTIME_VERSION}")
     FetchContent_Declare(onnxruntime
         URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/${_ORT_PKG}.${_ORT_EXT}"
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-    FetchContent_GetProperties(onnxruntime)
-    if(NOT onnxruntime_POPULATED)
-        FetchContent_Populate(onnxruntime)
-    endif()
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        SOURCE_SUBDIR "DO_NOT_BUILD")
+    FetchContent_MakeAvailable(onnxruntime)
     set(ONNXRUNTIME_DIR "${onnxruntime_SOURCE_DIR}")
     message(STATUS "[OnnxRuntime] 已下载至: ${ONNXRUNTIME_DIR}")
 endif()
@@ -65,11 +60,9 @@ else()
     FetchContent_Declare(ocr_models
         URL "${MODELS_DOWNLOAD_URL}"
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-        SOURCE_DIR "${CMAKE_SOURCE_DIR}/models")
-    FetchContent_GetProperties(ocr_models)
-    if(NOT ocr_models_POPULATED)
-        FetchContent_Populate(ocr_models)
-    endif()
+        SOURCE_DIR "${CMAKE_SOURCE_DIR}/models"
+        SOURCE_SUBDIR "DO_NOT_BUILD")
+    FetchContent_MakeAvailable(ocr_models)
     message(STATUS "[Models] 模型已下载至: ${CMAKE_SOURCE_DIR}/models")
 endif()
 
@@ -100,21 +93,8 @@ else()
         INTERFACE_LINK_LIBRARIES      "${JSONCPP_LIBRARIES}")
 endif()
 
-# Asio: CMake Config → FetchContent 回退
-find_package(asio CONFIG QUIET)
-if(NOT asio_FOUND)
-    FetchContent_Declare(asio
-        URL "https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-30-2.tar.gz"
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-    FetchContent_GetProperties(asio)
-    if(NOT asio_POPULATED)
-        FetchContent_Populate(asio)
-    endif()
-    add_library(asio_imported INTERFACE)
-    target_include_directories(asio_imported INTERFACE "${asio_SOURCE_DIR}/asio/include")
-    target_compile_definitions(asio_imported INTERFACE ASIO_STANDALONE)
-    add_library(asio::asio ALIAS asio_imported)
-endif()
+# Boost: Asio + Beast（HTTP/WebSocket）
+find_package(Boost REQUIRED COMPONENTS system)
 
 find_package(CUDAToolkit QUIET)
 
@@ -145,7 +125,7 @@ target_include_directories(ArknightsAutoBot PRIVATE
 target_link_libraries(ArknightsAutoBot PRIVATE
     ${OpenCV_LIBS}
     JsonCpp::JsonCpp
-    asio::asio
+    Boost::system
     ${ONNXRUNTIME_DIR}/lib/libonnxruntime${CMAKE_SHARED_LIBRARY_SUFFIX}
 )
 

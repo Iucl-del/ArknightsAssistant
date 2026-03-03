@@ -19,9 +19,9 @@ public:
 
     // 基本操作
     bool capture_screenshot(const std::string& filename);
-    bool click(int x, int y);
+    bool click(const cv::Point& pos);
     void wait(int ms);
-    bool swipe(int x1, int y1, int x2, int y2, int duration_ms);
+    bool swipe(const cv::Point& from, const cv::Point& to, int duration_ms);
     bool start_app();
     bool stop_app();
     void shell(const std::string& cmd);
@@ -32,8 +32,8 @@ public:
     // 视觉功能：不传 roi 则识别整张图，传入 roi 则只识别指定区域
     bool detect_text(const std::string& image_path, std::string& out_text,
                      std::optional<ROI> roi = std::nullopt);
-    bool find_template(const std::string& image_path, const std::string& template_path, int& out_x, int& out_y);
-    bool find_text(const std::string& image_path, const std::string& target_text, int& out_x, int& out_y);
+    bool find_template(const std::string& image_path, const std::string& template_path, cv::Point& out_pos);
+    bool find_text(const std::string& image_path, const std::string& target_text, cv::Point& out_pos);
 
 private:
     std::unique_ptr<ADBClient> adb_client_;

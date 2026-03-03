@@ -6,23 +6,37 @@
 #include <format>
 #include <sstream>
 #include <fstream>
-
-using asio::ip::tcp;
+#include <filesystem>
 
 ADBClient::ADBClient(std::string_view work_dir)
     : io_context_()
     , resolver_(io_context_)
     , work_dir_(work_dir)
+    , work_dir_created_(false)
 {
-    // 不再预先解析端点，host/port 由 connect/connect_to_server 提供
+    std::filesystem::path dir(work_dir_);
+    if (!dir.empty() && !std::filesystem::exists(dir)) {
+        std::filesystem::create_directories(dir);
+        work_dir_created_ = true;
+    }
 }
 
-ADBClient::~ADBClient() = default;
+ADBClient::~ADBClient() {
+    if (work_dir_created_) {
+        // 目录是自己创建的，直接整个删除（截图也在其中）
+        std::filesystem::remove_all(work_dir_);
+    } else {
+        // 目录是已有的，只删除运行过程中产生的截图文件
+        for (const auto& path : screenshot_paths_) {
+            std::filesystem::remove(path);
+        }
+    }
+}
 
 tcp::socket ADBClient::connect_to_server(std::string_view host, std::string_view port) {
     tcp::socket socket(io_context_);
     auto endpoints = resolver_.resolve(host, port);
-    asio::connect(socket, endpoints);
+    net::connect(socket, endpoints);
     return socket;
 }
 
@@ -30,24 +44,20 @@ std::string ADBClient::send_command(std::string_view command, std::string_view h
     try {
         auto socket = connect_to_server(host, port);
 
-        // ADB协议: 4位十六进制长度 + 命令内容
         std::string request = std::format("{:04x}{}", command.length(), command);
-        asio::write(socket, asio::buffer(request));
+        net::write(socket, net::buffer(request));
 
-        // 读取响应状态 (OKAY 或 FAIL)
         char status[4];
-        asio::read(socket, asio::buffer(status, 4));
+        net::read(socket, net::buffer(status, 4));
 
         std::string result;
         if (std::string_view(status, 4) == "OKAY") {
-            // 读取响应长度
             char len_buf[4];
-            asio::read(socket, asio::buffer(len_buf, 4));
+            net::read(socket, net::buffer(len_buf, 4));
             int len = std::stoi(std::string(len_buf, 4), nullptr, 16);
 
-            // 读取响应内容
             result.resize(len);
-            asio::read(socket, asio::buffer(result.data(), len));
+            net::read(socket, net::buffer(result.data(), len));
         }
 
         return result;
@@ -60,38 +70,31 @@ std::string ADBClient::send_device_command(std::string_view device_id, std::stri
     try {
         auto socket = connect_to_server(host, port);
 
-        // 先选择设备
         std::string transport_cmd = std::format("host:transport:{}", device_id);
         std::string request = std::format("{:04x}{}", transport_cmd.length(), transport_cmd);
-        asio::write(socket, asio::buffer(request));
+        net::write(socket, net::buffer(request));
 
         char status[4];
-        asio::read(socket, asio::buffer(status, 4));
+        net::read(socket, net::buffer(status, 4));
         if (std::string_view(status, 4) != "OKAY") {
             return "";
         }
 
-        // 发送命令
         request = std::format("{:04x}{}", command.length(), command);
-        asio::write(socket, asio::buffer(request));
+        net::write(socket, net::buffer(request));
 
-        asio::read(socket, asio::buffer(status, 4));
+        net::read(socket, net::buffer(status, 4));
         if (std::string_view(status, 4) != "OKAY") {
             return "";
         }
 
-        // 读取输出（直到连接关闭）
         std::string result;
         char buffer[4096];
-        asio::error_code ec;
+        boost::system::error_code ec;
         while (true) {
-            size_t n = socket.read_some(asio::buffer(buffer), ec);
-            if (ec == asio::error::eof || n == 0) {
-                break;
-            }
-            if (ec) {
-                break;
-            }
+            size_t n = socket.read_some(net::buffer(buffer), ec);
+            if (ec == net::error::eof || n == 0) break;
+            if (ec) break;
             result.append(buffer, n);
         }
 
@@ -157,7 +160,7 @@ bool ADBClient::capture_screenshot(std::string_view device_id, std::string_view 
     }
 
     // 生成完整保存路径
-    std::string save_path = std::format("{}/{}", work_dir_, filename);
+    std::filesystem::path save_path = std::filesystem::path(work_dir_) / std::string(filename);
 
     // 保存到本地文件
     std::ofstream file(save_path, std::ios::binary);
@@ -165,7 +168,15 @@ bool ADBClient::capture_screenshot(std::string_view device_id, std::string_view 
         return false;
     }
     file.write(png_data.data(), static_cast<std::streamsize>(png_data.size()));
-    return file.good();
+    bool ok = file.good();
+    file.close();
+
+    // 记录截图路径，析构时统一清理
+    if (ok) {
+        screenshot_paths_.push_back(save_path.string());
+    }
+
+    return ok;
 }
 
 bool ADBClient::pull(std::string_view device_id, std::string_view remote_path, std::string_view local_path) {
@@ -202,29 +213,26 @@ bool ADBClient::push(std::string_view device_id, std::string_view local_path, st
     try {
         auto socket = connect_to_server();
 
-        // 选择设备
         std::string transport_cmd = std::format("host:transport:{}", device_id);
         std::string request = std::format("{:04x}{}", transport_cmd.length(), transport_cmd);
-        asio::write(socket, asio::buffer(request));
+        net::write(socket, net::buffer(request));
 
         char status[4];
-        asio::read(socket, asio::buffer(status, 4));
+        net::read(socket, net::buffer(status, 4));
         if (std::string_view(status, 4) != "OKAY") {
             return false;
         }
 
-        // 发送shell命令
         std::string shell_cmd = std::format("shell:{}", cmd);
         request = std::format("{:04x}{}", shell_cmd.length(), shell_cmd);
-        asio::write(socket, asio::buffer(request));
+        net::write(socket, net::buffer(request));
 
-        asio::read(socket, asio::buffer(status, 4));
+        net::read(socket, net::buffer(status, 4));
         if (std::string_view(status, 4) != "OKAY") {
             return false;
         }
 
-        // 发送文件内容
-        asio::write(socket, asio::buffer(content));
+        net::write(socket, net::buffer(content));
         return true;
     } catch (const std::exception&) {
         return false;

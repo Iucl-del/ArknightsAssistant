@@ -8,6 +8,7 @@
       "features": ["core", "imgproc", "imgcodecs", "highgui"]
     },
     "jsoncpp",
-    "asio"
+    "boost-asio",
+    "boost-beast"
   ]
 }

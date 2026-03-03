@@ -1,30 +1,62 @@
 # Arknights Assistant
 
-明日方舟自动化助手，基于 OCR 和 ADB 实现游戏自动操作。
+基于 C++20 的轻量视觉自动化框架，集成 PP-OCR 推理引擎与节点式任务调度系统，以明日方舟为示例场景。
+
+## 技术栈
+
+| 模块 | 实现 |
+|------|------|
+| OCR 推理 | PP-OCRv4 + ONNX Runtime，自实现 det/rec pipeline |
+| 图像处理 | OpenCV 4（模板匹配、ROI 裁剪、预处理） |
+| ADB 通信 | Socket 直连 ADB Server，不依赖 adb 命令行进程 |
+| 任务引擎 | 节点式 pipeline，识别轮询 + 异步队列 |
+| 构建系统 | CMake 3.16+ / vcpkg / Ninja |
+
+## 架构
+
+```
+┌─────────────────────────────────────────┐
+│              TaskExecutor               │  异步任务队列 + 节点调度
+│   识别(OCR/TemplateMatch/DirectHit)     │
+│   动作(Click/Swipe/StartApp/StopApp)    │
+└────────────────┬────────────────────────┘
+                 │
+┌────────────────▼────────────────────────┐
+│            SimpleController             │  视觉能力 + 控制接口
+│  find_text / find_template / detect_text│
+└────────────────┬────────────────────────┘
+                 │  （多态，后续可扩展）
+       ┌─────────▼──────────┐
+       │     ADBClient      │  当前实现：ADB Socket 直连
+       └────────────────────┘
+       ┌────────────────────┐
+       │  Win32Controller   │  规划中：Windows 消息模拟
+       └────────────────────┘
+```
 
 ## 功能特性
 
-- 🎮 **ADB 设备控制** - 支持点击、滑动、截图等操作
-- 🔍 **OCR 文字识别** - 基于 PP-OCR + ONNX Runtime，识别游戏界面文字
-- 🖼️ **模板匹配** - 基于 OpenCV 的图像模板匹配
-- 📋 **节点式任务配置** - JSON 定义识别+动作节点，自动轮询截图
-- 🔄 **异步任务队列** - 支持任务排队执行
+- 🎮 **ADB 设备控制** — 支持点击、滑动、截图等操作，Socket 直连 ADB Server
+- 🔍 **PP-OCR 推理** — 自实现检测/识别 pipeline，基于 ONNX Runtime，不依赖 PaddlePaddle
+- 🖼️ **模板匹配** — OpenCV `matchTemplate`，支持可配置匹配阈值
+- 📋 **节点式任务配置** — JSON 描述识别+动作节点，执行器自动轮询截图，无需手动插入等待步骤
+- 🔄 **异步任务队列** — 工作线程 + 条件变量，支持任务排队与回调
 
 ## 项目结构
 
 ```
 ArknightsAutoBot/
 ├── include/                    # 头文件
-│   ├── adb/                    # ADB 模块
-│   ├── vision/                 # 视觉模块 (OCR)
-│   └── task/                   # 任务模块
-├── src/                        # 源文件
-├── resource/tasks/             # JSON 任务配置
-├── models/onnx/                # OCR 模型文件
-└── onnxruntime/                # ONNX Runtime 库
+│   ├── adb/                    # ADB 通信模块
+│   ├── vision/                 # OCR 推理模块（det/rec/pack）
+│   └── task/                   # 任务配置与执行（TaskNode/TaskLoader/TaskExecutor）
+├── src/                        # 实现文件
+├── resource/tasks/             # JSON 任务配置示例
+├── models/onnx/                # PP-OCR ONNX 模型
+└── onnxruntime/                # ONNX Runtime 预构建库
 ```
 
-## 快速部署
+## 快速开始
 
 ### 前置条件
 
@@ -70,17 +102,6 @@ cmake --build --preset linux-x64-vcpkg   # preset 名与上一行对应
 1. 通过 vcpkg 下载编译 OpenCV、jsoncpp
 2. 从 GitHub Releases 下载对应平台的 ONNX Runtime 预构建包
 
-**全部预设一览：**
-
-| 预设名 | 平台 | 依赖管理 |
-|--------|------|----------|
-| `linux-x64` | Linux x64 | 系统已安装的包 |
-| `linux-x64-vcpkg` | Linux x64 | vcpkg |
-| `linux-arm64-vcpkg` | Linux ARM64 | vcpkg |
-| `windows-x64-vcpkg` | Windows x64 | vcpkg |
-| `macos-vcpkg` | macOS | vcpkg |
-| `linux-x64-cuda` | Linux x64 | vcpkg + CUDA GPU 加速 |
-
 #### 方式 B — 系统包（Linux 快速部署）
 
 ```bash
@@ -91,6 +112,17 @@ sudo apt install libopencv-dev libjsoncpp-dev cmake ninja-build g++
 cmake --preset linux-x64
 cmake --build --preset linux-x64
 ```
+
+**全部预设一览：**
+
+| 预设名 | 平台 | 依赖管理 |
+|--------|------|----------|
+| `linux-x64` | Linux x64 | 系统已安装的包 |
+| `linux-x64-vcpkg` | Linux x64 | vcpkg |
+| `linux-arm64-vcpkg` | Linux ARM64 | vcpkg |
+| `windows-x64-vcpkg` | Windows x64 | vcpkg |
+| `macos-vcpkg` | macOS | vcpkg |
+| `linux-x64-cuda` | Linux x64 | vcpkg + CUDA GPU 加速 |
 
 ---
 
@@ -137,7 +169,7 @@ cmake --build --preset linux-x64-vcpkg
 
 ## 使用
 
-### 基本用法
+### 代码示例
 
 ```cpp
 #include "SimpleController.hpp"
@@ -153,7 +185,9 @@ int main() {
 
     std::string task_path = std::string(Config::PROJECT_ROOT_DIR)
                           + "/resource/tasks/start_arknights.json";
-    executor.submit(task_path, [&](){});
+    executor.submit(task_path, [&](){
+        // 任务完成回调
+    });
 
     return 0;
 }
@@ -177,8 +211,6 @@ int main() {
 |------|------|------|
 | `Click` | 点击（识别位置或指定坐标） | `target`: `[x, y]`（可选） |
 | `Swipe` | 滑动 | `target`: `[x1, y1, x2, y2, duration]` |
-| `StartApp` | 启动游戏（无需参数） | 无 |
-| `StopApp` | 关闭游戏（无需参数） | 无 |
 
 #### 节点可选参数
 

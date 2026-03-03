@@ -5,6 +5,44 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.0] - 2026-03-03
+
+### 新增
+- **ADB 工作目录生命周期管理**
+  - 构造 `ADBClient` 时自动检测 `work_dir`，不存在则创建并标记为自建目录
+  - 析构时自动清理：自建目录整体删除，已有目录仅删除运行期间产生的截图文件
+  - 新增 `work_dir_created_` 标记与 `screenshot_paths_` 记录，确保资源不泄漏
+- 任务配置 `start_arknights.json` 新增"关闭公告"节点（模板匹配 `close_announcement.png`）
+- 任务配置"开始唤醒"节点改用 `TemplateMatch` 识别 `START.png`，替代 `DirectHit` 固定坐标点击
+
+### 变更
+- **Asio → Boost.Asio 迁移**
+  - 将独立 Asio 替换为 Boost.Asio，`asio::` 命名空间统一改为 `net`（`boost::asio`）
+  - vcpkg 依赖从 `asio` 改为 `boost-asio` + `boost-beast`
+  - CMake `find_package(Boost REQUIRED COMPONENTS system)` 替代 FetchContent 回退
+- **SimpleController 接口统一使用 `cv::Point`**
+  - `click(int x, int y)` → `click(const cv::Point& pos)`
+  - `swipe(int x1, int y1, int x2, int y2, int duration_ms)` → `swipe(const cv::Point& from, const cv::Point& to, int duration_ms)`
+  - `find_template` / `find_text` 输出参数从 `int& out_x, int& out_y` 改为 `cv::Point& out_pos`
+- **CMake 构建改进**
+  - 最低版本从 3.16 升至 3.30
+  - FetchContent 从 `Populate` 改为 `MakeAvailable`，使用 `SOURCE_SUBDIR "DO_NOT_BUILD"` 跳过子项目构建
+  - 移除 `CMP0169` 策略兼容代码
+- README 重写：补充架构图、技术栈表格，重新组织快速开始章节
+
+### 移除
+- 任务动作类型中移除 `StartApp` / `StopApp` 文档说明
+- README 中移除提前展示的预设一览表（调整至方式 B 之后）
+
+### 依赖变更
+
+| 依赖 | 旧方式 | 新方式 |
+|------|-------|-------|
+| Asio | 独立 Asio（vcpkg / FetchContent） | Boost.Asio（vcpkg `boost-asio`） |
+| Boost | 无 | `boost-asio` + `boost-beast` |
+
+---
+
 ## [0.4.0] - 2026-02-28
 
 ### 新增

@@ -44,16 +44,16 @@ std::string SimpleController::auto_screenshot(const std::string& hint) {
     return "";
 }
 
-bool SimpleController::click(int x, int y) {
+bool SimpleController::click(const cv::Point& pos) {
     if (!adb_client_) return false;
-    std::string cmd = std::format("input tap {} {}", x, y);
+    std::string cmd = std::format("input tap {} {}", pos.x, pos.y);
     adb_client_->shell(device_address_, cmd);
     return true;
 }
 
-bool SimpleController::swipe(int x1, int y1, int x2, int y2, int duration_ms) {
+bool SimpleController::swipe(const cv::Point& from, const cv::Point& to, int duration_ms) {
     if (!adb_client_) return false;
-    std::string cmd = std::format("input swipe {} {} {} {} {}", x1, y1, x2, y2, duration_ms);
+    std::string cmd = std::format("input swipe {} {} {} {} {}", from.x, from.y, to.x, to.y, duration_ms);
     adb_client_->shell(device_address_, cmd);
     return true;
 }
@@ -109,7 +109,7 @@ bool SimpleController::detect_text(const std::string& image_path, std::string& o
     return !out_text.empty();
 }
 
-bool SimpleController::find_template(const std::string& image_path, const std::string& template_path, int& out_x, int& out_y) {
+bool SimpleController::find_template(const std::string& image_path, const std::string& template_path, cv::Point& out_pos) {
     std::string full_image_path = work_dir_ + "/" + image_path;
     std::string full_template_path = std::string(Config::PROJECT_ROOT_DIR) + "/" + template_path;
     cv::Mat img = cv::imread(full_image_path);
@@ -123,15 +123,15 @@ bool SimpleController::find_template(const std::string& image_path, const std::s
     cv::Point minLoc, maxLoc;
     cv::minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc);
 
-    if (maxVal > 0.8) {  // 匹配阈值
-        out_x = maxLoc.x + templ.cols / 2;
-        out_y = maxLoc.y + templ.rows / 2;
+    if (maxVal > 0.8) {
+        out_pos.x = maxLoc.x + templ.cols / 2;
+        out_pos.y = maxLoc.y + templ.rows / 2;
         return true;
     }
     return false;
 }
 
-bool SimpleController::find_text(const std::string& image_path, const std::string& target_text, int& out_x, int& out_y) {
+bool SimpleController::find_text(const std::string& image_path, const std::string& target_text, cv::Point& out_pos) {
     if (!vision_api_) return false;
     std::string full_path = work_dir_ + "/" + image_path;
     cv::Mat img = cv::imread(full_path);
@@ -140,14 +140,13 @@ bool SimpleController::find_text(const std::string& image_path, const std::strin
     auto results = vision_api_->recognizeAll(img);
     for (const auto& [box, text] : results) {
         if (text.find(target_text) != std::string::npos) {
-            // 计算文本框中心点
             float cx = 0, cy = 0;
             for (const auto& pt : box.box) {
                 cx += pt.x;
                 cy += pt.y;
             }
-            out_x = static_cast<int>(cx / static_cast<float>(box.box.size()));
-            out_y = static_cast<int>(cy / static_cast<float>(box.box.size()));
+            out_pos.x = static_cast<int>(cx / static_cast<float>(box.box.size()));
+            out_pos.y = static_cast<int>(cy / static_cast<float>(box.box.size()));
             return true;
         }
     }

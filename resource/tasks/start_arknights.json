@@ -7,14 +7,22 @@
       "post_delay": 10000
     },
     {
-      "recognition": "DirectHit",
+      "recognition": "TemplateMatch",
+      "template": "resource/templates/START.png",
       "action": "Click",
-      "target": [960, 540],
-      "post_delay": 500
+      "timeout": 20000,
+      "interval": 2000
     },
     {
       "recognition": "OCR",
       "expected": "开始唤醒",
+      "action": "Click",
+      "timeout": 20000,
+      "interval": 2000
+    },
+    {
+      "recognition": "TemplateMatch",
+      "template": "resource/templates/close_announcement.png",
       "action": "Click",
       "timeout": 20000,
       "interval": 2000
