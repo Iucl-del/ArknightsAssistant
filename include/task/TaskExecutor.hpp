@@ -25,8 +25,15 @@ private:
     void worker_loop();
     bool execute_task(const TaskConfig& task);
 
-    // 执行单个节点：识别轮询 → 动作 → 返回是否成功
-    bool execute_node(const TaskNode& node);
+    // 节点执行结果
+    enum class NodeResult {
+        SUCCESS,    // 识别成功并执行了动作
+        FAILED,     // 识别失败，任务应中止
+        JUMP        // 识别失败，需要跳转到 on_fail_jump 指定的节点
+    };
+
+    // 执行单个节点：识别轮询 → 动作 → 返回执行结果
+    NodeResult execute_node(const TaskNode& node);
 
     // 识别：对已有截图执行检测，返回是否匹配成功
     bool recognize(const TaskNode& node, const std::string& screenshot);

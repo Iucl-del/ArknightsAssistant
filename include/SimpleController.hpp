@@ -16,7 +16,7 @@ public:
     SimpleController();
     ~SimpleController();
 
-    // 连接设备（ip 和 port 分开传，与 ADBClient 保持一致）
+    // 连接设备（ip 和 port 分开传，与 controller 保持一致）
     bool connect(const std::string& adb_path, const std::string& ip, const std::string& port);
 
     // 基本操作
@@ -44,7 +44,7 @@ public:
                                        cv::Point& out_pos);
 
 private:
-    std::unique_ptr<ADBClient> adb_client_;
+    std::unique_ptr<ADBClient> controller_;
     std::unique_ptr<OcrPack> vision_api_;
     std::string device_address_;
     std::string work_dir_;

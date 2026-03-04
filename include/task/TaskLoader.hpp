@@ -46,7 +46,14 @@ private:
                 // 识别
                 node.recognition = n.get("recognition", "DirectHit").asString();
                 node.method = n.get("method", "Ccoeff").asString();
-                node.expected = n.get("expected", "").asString();
+                if (n.isMember("expected")) {
+                    const auto& e = n["expected"];
+                    if (e.isArray()) {
+                        for (const auto& v : e) node.expected.push_back(v.asString());
+                    } else {
+                        node.expected.push_back(e.asString());
+                    }
+                }
                 if (n.isMember("template")) {
                     const auto& t = n["template"];
                     if (t.isArray()) {
@@ -114,6 +121,8 @@ private:
 
                 // 失败策略
                 node.repeat_until_failed = n.get("repeat_until_failed", false).asBool();
+                node.optional = n.get("optional", false).asBool();
+                node.on_fail_jump = n.get("on_fail_jump", -1).asInt();
 
                 config.nodes.emplace_back(std::move(node));
             }

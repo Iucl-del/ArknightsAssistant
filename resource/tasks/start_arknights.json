@@ -21,11 +21,11 @@
       "recognition": "TemplateMatch",
       "method": "Grayscale",
       "template": [
-        "resource/templates/OfflineCancel.png"
+        "resource/templates/AnnouncementClose.png"
       ],
       "threshold": 0.7,
       "action": "Click",
-      "timeout": 20000,
+      "timeout": 10000,
       "repeat_until_failed": true
     }
   ]

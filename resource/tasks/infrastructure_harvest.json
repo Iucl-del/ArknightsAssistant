@@ -5,37 +5,36 @@
       "recognition": "OCR",
       "expected": "基建",
       "action": "Click",
-      "timeout": 10000
+      "post_delay": 5000
     },
     {
-      "recognition": "OCR",
-      "expected": "进驻总览",
+      "recognition": "TemplateMatch",
+      "method": "Ccoeff",
+      "template": "resource/templates/bell_infrastructure.png",
       "action": "Click",
-      "timeout": 10000
+      "timeout": 3000,
+      "on_fail_jump": 3
     },
     {
       "recognition": "OCR",
-      "expected": "可收获",
-      "action": "Click",
-      "timeout": 8000
-    },
-    {
-      "recognition": "OCR",
-      "expected": "收取",
+      "expected": ["可收获","订单交付","干员信赖","干员休整"],
+      "roi": [0, 600, 800, 118],
       "action": "Click",
       "timeout": 6000,
-      "interval": 800
+      "repeat_until_failed": true
     },
     {
-      "recognition": "DirectHit",
-      "action": "Click",
-      "target": [100, 50],
-      "post_delay": 1000
+      "recognition": "TemplateMatch",
+      "method": "Ccoeff",
+      "template": "resource/templates/btn_back.png",
+      "action": "Click"
     },
     {
-      "recognition": "DirectHit",
+      "recognition": "TemplateMatch",
+      "method": "Grayscale",
+      "template": "resource/templates/PopupConfirm.png",
       "action": "Click",
-      "target": [100, 50]
+      "timeout": 5000
     }
   ]
 }

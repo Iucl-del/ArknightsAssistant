@@ -34,12 +34,12 @@ struct TaskNode {
     // ---- 识别 ----
     std::string recognition = "DirectHit";  // DirectHit | OCR | TemplateMatch
     std::string method = "Ccoeff";          // Ccoeff | HSVCount | RGBCount（仅 TemplateMatch 生效）
-    std::string expected;                   // OCR 期望匹配文本
+    std::vector<std::string> expected;      // OCR 期望匹配文本（支持多个，任一匹配即成功）
     std::vector<std::string> template_paths;// TemplateMatch 模板图路径（支持多个，轮询匹配）
     std::optional<ROI> roi;                 // 识别区域（可选）
     std::vector<ColorRange> color_scales;   // 颜色范围列表（HSVCount/RGBCount）
     double threshold = 0.8;                 // 匹配阈值（Ccoeff 默认 0.8；颜色计数为像素占比 0.0~1.0）
-    int timeout = 20000;                    // 识别超时(ms)
+    int timeout = 10000;                    // 识别超时(ms)
     int interval = 100;                     // 识别轮询间隔(ms)
 
 
@@ -54,6 +54,8 @@ struct TaskNode {
 
     // ---- 失败策略 ----
     bool repeat_until_failed = false;       // true: 反复执行(识别→动作)直到识别失败，适用于关闭多个弹窗
+    bool optional = false;                  // true: 识别超时或失败时跳过该节点，不中断任务
+    int on_fail_jump = -1;                  // 识别失败时跳转到的节点索引(从0开始)，-1表示不跳转
 };
 
 // 任务配置

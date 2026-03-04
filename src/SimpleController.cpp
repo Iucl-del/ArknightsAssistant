@@ -24,13 +24,13 @@ bool SimpleController::connect(const std::string& adb_path, const std::string& i
     work_dir_ = adb_path;
     game_package_ = "com.hypergryph.arknights/com.u8.sdk.U8UnityContext";
 
-    adb_client_ = std::make_unique<ADBClient>(adb_path);
-    return adb_client_->connect(ip, port);
+    controller_ = std::make_unique<ADBClient>(adb_path);
+    return controller_->connect(ip, port);
 }
 
 bool SimpleController::capture_screenshot(const std::string& filename) {
-    if (!adb_client_) return false;
-    return adb_client_->capture_screenshot(device_address_, filename);
+    if (!controller_) return false;
+    return controller_->capture_screenshot(device_address_, filename);
 }
 
 std::string SimpleController::auto_screenshot(const std::string& hint) {
@@ -46,16 +46,16 @@ std::string SimpleController::auto_screenshot(const std::string& hint) {
 }
 
 bool SimpleController::click(const cv::Point& pos) {
-    if (!adb_client_) return false;
+    if (!controller_) return false;
     std::string cmd = std::format("input tap {} {}", pos.x, pos.y);
-    adb_client_->shell(device_address_, cmd);
+    controller_->shell(device_address_, cmd);
     return true;
 }
 
 bool SimpleController::swipe(const cv::Point& from, const cv::Point& to, int duration_ms) {
-    if (!adb_client_) return false;
+    if (!controller_) return false;
     std::string cmd = std::format("input swipe {} {} {} {} {}", from.x, from.y, to.x, to.y, duration_ms);
-    adb_client_->shell(device_address_, cmd);
+    controller_->shell(device_address_, cmd);
     return true;
 }
 
@@ -64,22 +64,22 @@ void SimpleController::wait(int ms) {
 }
 
 bool SimpleController::start_app() {
-    if (!adb_client_) return false;
-    adb_client_->shell(device_address_, "am start -n " + game_package_);
+    if (!controller_) return false;
+    controller_->shell(device_address_, "am start -n " + game_package_);
     return true;
 }
 
 bool SimpleController::stop_app() {
-    if (!adb_client_) return false;
+    if (!controller_) return false;
     // 提取包名（去掉 Activity 部分）
     std::string pkg = game_package_.substr(0, game_package_.find('/'));
-    adb_client_->shell(device_address_, "am force-stop " + pkg);
+    controller_->shell(device_address_, "am force-stop " + pkg);
     return true;
 }
 
 void SimpleController::shell(const std::string& cmd) {
-    if (adb_client_) {
-        adb_client_->shell(device_address_, cmd);
+    if (controller_) {
+        controller_->shell(device_address_, cmd);
     }
 }
 
