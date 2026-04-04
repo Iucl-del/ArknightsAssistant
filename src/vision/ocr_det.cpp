@@ -2,7 +2,11 @@
 #include <algorithm>
 
 TextDetector::TextDetector(Ort::Env& env, const std::string& model_path)
+#ifdef _WIN32
+    : session_(env, std::wstring(model_path.begin(), model_path.end()).c_str(), Ort::SessionOptions{nullptr}) {
+#else
     : session_(env, model_path.c_str(), Ort::SessionOptions{nullptr}) {
+#endif
 
     size_t num_input = session_.GetInputCount();
     size_t num_output = session_.GetOutputCount();

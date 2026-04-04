@@ -67,18 +67,18 @@ else()
 endif()
 
 # ============================================================
-# 生成配置头文件
+# 生成配置头文件（输出到 build 目录，不污染源码树）
 # ============================================================
 configure_file(
     ${CMAKE_SOURCE_DIR}/include/Config.hpp.in
-    ${CMAKE_SOURCE_DIR}/include/Config.hpp @ONLY)
+    ${CMAKE_BINARY_DIR}/include/Config.hpp @ONLY)
 
 # ============================================================
 # 第三方依赖
 # ============================================================
 find_package(OpenCV REQUIRED)
 
-# jsoncpp: CMake Config → pkg-config 回退，统一暴露 JsonCpp::JsonCpp
+# jsoncpp: CMake Config → pkg-config 回退（仅非 vcpkg 环境如 linux-x64 会走后者）
 find_package(jsoncpp CONFIG QUIET)
 if(jsoncpp_FOUND)
     if(NOT TARGET JsonCpp::JsonCpp AND TARGET jsoncpp_lib)
@@ -97,6 +97,17 @@ endif()
 find_package(Boost REQUIRED COMPONENTS system)
 
 find_package(CUDAToolkit QUIET)
+
+# ============================================================
+# Windows 编译选项
+# ============================================================
+if(WIN32)
+    add_compile_definitions(
+        _WIN32_WINNT=0x0A00   # Windows 10
+        NOMINMAX
+    )
+    add_compile_options(/utf-8)   # 源文件 UTF-8 编码
+endif()
 
 # ============================================================
 # 可执行文件
@@ -118,20 +129,29 @@ target_include_directories(ArknightsAutoBot PRIVATE
     ${PROJECT_SOURCE_DIR}/include/adb
     ${PROJECT_SOURCE_DIR}/include/vision
     ${PROJECT_SOURCE_DIR}/include/task
+    ${CMAKE_BINARY_DIR}/include
     ${ONNXRUNTIME_DIR}/include
     ${OpenCV_INCLUDE_DIRS}
 )
+
+if(WIN32)
+    set(ONNXRUNTIME_LIB "${ONNXRUNTIME_DIR}/lib/onnxruntime.lib")
+else()
+    set(ONNXRUNTIME_LIB "${ONNXRUNTIME_DIR}/lib/libonnxruntime${CMAKE_SHARED_LIBRARY_SUFFIX}")
+endif()
 
 target_link_libraries(ArknightsAutoBot PRIVATE
     ${OpenCV_LIBS}
     JsonCpp::JsonCpp
     Boost::system
-    ${ONNXRUNTIME_DIR}/lib/libonnxruntime${CMAKE_SHARED_LIBRARY_SUFFIX}
+    ${ONNXRUNTIME_LIB}
 )
 
-set_target_properties(ArknightsAutoBot PROPERTIES
-    BUILD_RPATH   "${ONNXRUNTIME_DIR}/lib"
-    INSTALL_RPATH "${ONNXRUNTIME_DIR}/lib")
+if(NOT WIN32)
+    set_target_properties(ArknightsAutoBot PROPERTIES
+        BUILD_RPATH   "${ONNXRUNTIME_DIR}/lib"
+        INSTALL_RPATH "${ONNXRUNTIME_DIR}/lib")
+endif()
 
 if(CUDAToolkit_FOUND)
     target_link_libraries(ArknightsAutoBot PRIVATE CUDA::cudart)
