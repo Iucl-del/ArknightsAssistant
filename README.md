@@ -86,16 +86,17 @@ cd ArknightsAutoBot
 
 ```bash
 # 安装 vcpkg（若未安装，仅首次）
-git clone https://github.com/microsoft/vcpkg.git ~/vcpkg
-~/vcpkg/bootstrap-vcpkg.sh          # Windows: bootstrap-vcpkg.bat
-export VCPKG_ROOT=~/vcpkg           # Windows: set VCPKG_ROOT=C:\vcpkg
+git clone https://github.com/microsoft/vcpkg.git
+cd vcpkg
+./bootstrap-vcpkg.sh          # Windows: bootstrap-vcpkg.bat
+export VCPKG_ROOT=$PWD/vcpkg  # Windows: set VCPKG_ROOT=%cd%\vcpkg
 
 # 配置 + 编译（选择对应平台预设）
-cmake --preset linux-x64-vcpkg      # Linux x64
-cmake --preset windows-x64-vcpkg    # Windows x64
-cmake --preset macos-vcpkg          # macOS
+cmake --preset linux      # Linux x64
+cmake --preset windows    # Windows x64
+cmake --preset macos          # macOS
 
-cmake --build --preset linux-x64-vcpkg   # preset 名与上一行对应
+cmake --build --preset linux   # preset 名与上一行对应
 ```
 
 构建过程中 CMake 会自动：
@@ -117,12 +118,9 @@ cmake --build --preset linux-x64
 
 | 预设名 | 平台 | 依赖管理 |
 |--------|------|----------|
-| `linux-x64` | Linux x64 | 系统已安装的包 |
-| `linux-x64-vcpkg` | Linux x64 | vcpkg |
-| `linux-arm64-vcpkg` | Linux ARM64 | vcpkg |
-| `windows-x64-vcpkg` | Windows x64 | vcpkg |
-| `macos-vcpkg` | macOS | vcpkg |
-| `linux-x64-cuda` | Linux x64 | vcpkg + CUDA GPU 加速 |
+| `linux` | Linux x64 | vcpkg |
+| `windows` | windows x64 | vcpkg |
+| `macos` | macOS | vcpkg |
 
 ---
 
@@ -142,7 +140,7 @@ adb devices
 
 ```bash
 # 可执行文件位于 build/<preset-name>/ 目录下
-./build/linux-x64-vcpkg/ArknightsAutoBot
+./build/linux/ArknightsAutoBot
 ```
 
 > 确保以**项目根目录**为工作目录运行，程序依赖相对路径 `resource/tasks/` 和 `models/onnx/`。
@@ -151,20 +149,14 @@ adb devices
 
 ## 模型管理
 
-OCR 模型文件（~50MB）支持两种管理方式：
-
-### 方式一：本地模型（默认）
-
-模型已包含在仓库中，`git clone` 后直接可用，无需额外操作。
-
-### 方式二：GitHub Releases 分发（适合 CI/CD）
+### GitHub Releases 分发（CI/CD管理）
 
 模型已托管于 [GitHub Releases v1.0-models](https://github.com/Iucl-del/ArknightsAssistant/releases/tag/v1.0-models)，构建时通过 `MODELS_DOWNLOAD_URL` 自动下载：
 
 ```bash
-cmake --preset linux-x64-vcpkg \
+cmake --preset linux \
     -DMODELS_DOWNLOAD_URL=https://github.com/Iucl-del/ArknightsAssistant/releases/download/v1.0-models/models.tar.gz
-cmake --build --preset linux-x64-vcpkg
+cmake --build --preset linux
 ```
 
 ## 使用
