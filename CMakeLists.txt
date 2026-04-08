@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.16)
 project(ArknightsAutoBot)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -94,7 +94,7 @@ else()
 endif()
 
 # Boost: Asio + Beast（HTTP/WebSocket）
-find_package(Boost REQUIRED COMPONENTS system)
+find_package(Boost CONFIG REQUIRED COMPONENTS system)
 
 find_package(CUDAToolkit QUIET)
 

@@ -4,133 +4,46 @@
     {
       "name": "base",
       "hidden": true,
-      "generator": "Ninja",
+      "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release",
+        "MODELS_DOWNLOAD_URL": "https://github.com/Iucl-del/ArknightsAssistant/releases/download/v1.0-models/models.tar.gz"
       }
     },
+
     {
-      "name": "base-vcpkg",
-      "hidden": true,
+      "name": "linux",
+      "displayName": "Linux x64",
       "inherits": "base",
-      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
     },
     {
-      "name": "linux-x64",
-      "displayName": "Linux x64 Release（系统包）",
+      "name": "windows",
+      "displayName": "Windows x64",
       "inherits": "base",
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Linux"
-      }
+      "cacheVariables": { "VCPKG_TARGET_TRIPLET": "x64-windows" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     },
     {
-      "name": "linux-x64-vcpkg",
-      "displayName": "Linux x64 Release（vcpkg）",
-      "inherits": "base-vcpkg",
-      "cacheVariables": {
-        "MODELS_DOWNLOAD_URL": "https://github.com/Iucl-del/ArknightsAssistant/releases/download/v1.0-models/models.tar.gz"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Linux"
-      }
-    },
-    {
-      "name": "linux-arm64-vcpkg",
-      "displayName": "Linux arm64 Release（vcpkg）",
-      "inherits": "base-vcpkg",
-      "cacheVariables": {
-        "CMAKE_SYSTEM_PROCESSOR": "aarch64",
-        "MODELS_DOWNLOAD_URL": "https://github.com/Iucl-del/ArknightsAssistant/releases/download/v1.0-models/models.tar.gz"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Linux"
-      }
-    },
-    {
-      "name": "windows-x64-vcpkg",
-      "displayName": "Windows x64 Release（vcpkg）",
-      "inherits": "base-vcpkg",
-      "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-windows",
-        "MODELS_DOWNLOAD_URL": "https://github.com/Iucl-del/ArknightsAssistant/releases/download/v1.0-models/models.tar.gz"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
-      "name": "windows-x64-vcpkg-debug",
-      "displayName": "Windows x64 Debug（vcpkg）",
-      "inherits": "windows-x64-vcpkg",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "macos-vcpkg",
-      "displayName": "macOS Release（vcpkg）",
-      "inherits": "base-vcpkg",
-      "cacheVariables": {
-        "MODELS_DOWNLOAD_URL": "https://github.com/Iucl-del/ArknightsAssistant/releases/download/v1.0-models/models.tar.gz"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Darwin"
-      }
-    },
-    {
-      "name": "linux-x64-cuda",
-      "displayName": "Linux x64 Release + CUDA（vcpkg）",
-      "inherits": "linux-x64-vcpkg",
-      "cacheVariables": {
-        "ORT_WITH_CUDA": "ON"
-      }
+      "name": "macos",
+      "displayName": "macOS",
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
     }
   ],
   "buildPresets": [
-    { "name": "linux-x64",               "configurePreset": "linux-x64" },
-    { "name": "linux-x64-vcpkg",         "configurePreset": "linux-x64-vcpkg" },
-    { "name": "linux-arm64-vcpkg",       "configurePreset": "linux-arm64-vcpkg" },
-    { "name": "windows-x64-vcpkg",       "configurePreset": "windows-x64-vcpkg" },
-    { "name": "windows-x64-vcpkg-debug", "configurePreset": "windows-x64-vcpkg-debug" },
-    { "name": "macos-vcpkg",             "configurePreset": "macos-vcpkg" },
-    { "name": "linux-x64-cuda",          "configurePreset": "linux-x64-cuda" }
+    { "name": "linux-debug",     "configurePreset": "linux",   "configuration": "Debug" },
+    { "name": "linux-release",   "configurePreset": "linux",   "configuration": "Release" },
+    { "name": "windows-debug",   "configurePreset": "windows", "configuration": "Debug" },
+    { "name": "windows-release", "configurePreset": "windows", "configuration": "Release" },
+    { "name": "macos-debug",     "configurePreset": "macos",   "configuration": "Debug" },
+    { "name": "macos-release",   "configurePreset": "macos",   "configuration": "Release" }
   ],
   "packagePresets": [
-    {
-      "name": "linux-x64",
-      "configurePreset": "linux-x64",
-      "generators": ["TGZ"]
-    },
-    {
-      "name": "linux-x64-vcpkg",
-      "configurePreset": "linux-x64-vcpkg",
-      "generators": ["TGZ", "DEB"]
-    },
-    {
-      "name": "linux-arm64-vcpkg",
-      "configurePreset": "linux-arm64-vcpkg",
-      "generators": ["TGZ", "DEB"]
-    },
-    {
-      "name": "windows-x64-vcpkg",
-      "configurePreset": "windows-x64-vcpkg",
-      "generators": ["ZIP"]
-    },
-    {
-      "name": "macos-vcpkg",
-      "configurePreset": "macos-vcpkg",
-      "generators": ["TGZ"]
-    }
+    { "name": "linux",   "configurePreset": "linux",   "generators": ["TGZ", "DEB"] },
+    { "name": "windows", "configurePreset": "windows", "generators": ["ZIP"] },
+    { "name": "macos",   "configurePreset": "macos",   "generators": ["TGZ"] }
   ]
 }
