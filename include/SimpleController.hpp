@@ -4,17 +4,21 @@
 #include <memory>
 #include <optional>
 #include <atomic>
+
 #include "adb/ADBClient.hpp"
 #include "vision/ocr_pack.h"
 #include "vision/vision_types.h"
 #include "vision/image_preprocessor.h"
-#include "task/TaskConfig.hpp"
 
-class SimpleController {
+class TaskExecutor;
+
+class SimpleController: public std::enable_shared_from_this<SimpleController> {
 public:
     using Task = std::function<void(SimpleController&)>;
     SimpleController();
     ~SimpleController();
+
+    std::shared_ptr<TaskExecutor> get_executor(){return executor_;}
 
     // 连接设备（ip 和 port 分开传，与 controller 保持一致）
     bool connect(const std::string& adb_path, const std::string& ip, const std::string& port);
@@ -51,4 +55,5 @@ private:
     std::string work_dir_;
     std::string game_package_;
     std::atomic<int> screenshot_seq_{0};
+    std::shared_ptr<TaskExecutor> executor_;
 };

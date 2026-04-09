@@ -5,6 +5,7 @@
 #include <chrono>
 #include <format>
 #include <opencv2/opencv.hpp>
+#include "TaskExecutor.hpp"
 
 SimpleController::SimpleController() {
     // 初始化 OCR 模块
@@ -16,6 +17,8 @@ SimpleController::SimpleController() {
         dict_path,
         DeviceType::GPU
     );
+    auto self = shared_from_this();
+    executor_=std::make_shared<TaskExecutor>(self);
 }
 
 SimpleController::~SimpleController() = default;
