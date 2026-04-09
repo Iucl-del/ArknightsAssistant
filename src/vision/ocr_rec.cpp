@@ -3,11 +3,11 @@
 #include <iostream>
 
 TextRecognizer::TextRecognizer(Ort::Env& env, const std::string& model_path,
-                               const std::string& dict_path)
+                               const std::string& dict_path, const Ort::SessionOptions& session_options)
 #ifdef _WIN32
-    : session_(env, std::wstring(model_path.begin(), model_path.end()).c_str(), Ort::SessionOptions{nullptr}) {
+    : session_(env, std::wstring(model_path.begin(), model_path.end()).c_str(), session_options) {
 #else
-    : session_(env, model_path.c_str(), Ort::SessionOptions{nullptr}) {
+    : session_(env, model_path.c_str(), session_options) {
 #endif
 
     loadDict(dict_path);
@@ -77,25 +77,23 @@ cv::Mat TextRecognizer::preprocess(const cv::Mat& img) {
     cv::Mat enhanced_bgr;
     cv::cvtColor(enhanced, enhanced_bgr, cv::COLOR_GRAY2BGR);
 
-    // 计算缩放比例
+    // 计算宽高比
     float ratio = enhanced_bgr.cols * 1.0f / enhanced_bgr.rows;
     int resize_w = std::min(int(img_h * ratio), img_w);
 
-    cv::Mat resized;
-    cv::resize(enhanced_bgr, resized, cv::Size(resize_w, img_h), 0, 0, cv::INTER_CUBIC);
+    cv::Mat result;
+    cv::resize(enhanced_bgr, result, cv::Size(resize_w, img_h), 0, 0, cv::INTER_CUBIC);
 
     if (resize_w < img_w) {
-        cv::copyMakeBorder(resized, resized, 0, 0, 0, img_w - resize_w,
+        cv::copyMakeBorder(result, result, 0, 0, 0, img_w - resize_w,
                           cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
     }
 
-    resized.convertTo(resized, CV_32FC3, 1.0 / 255.0);
+    result.convertTo(result, CV_32FC3, 1.0 / 255.0);
+    cv::subtract(result, cv::Scalar(0.5, 0.5, 0.5), result);
+    cv::divide(result, cv::Scalar(0.5, 0.5, 0.5), result);
 
-    cv::Mat normalized;
-    cv::subtract(resized, cv::Scalar(0.5, 0.5, 0.5), normalized);
-    cv::divide(normalized, cv::Scalar(0.5, 0.5, 0.5), normalized);
-
-    return normalized;
+    return result;
 }
 
 std::string TextRecognizer::recognize(const cv::Mat& img) {

@@ -1,11 +1,11 @@
 #include "ocr_det.h"
 #include <algorithm>
 
-TextDetector::TextDetector(Ort::Env& env, const std::string& model_path)
+TextDetector::TextDetector(Ort::Env& env, const std::string& model_path, const Ort::SessionOptions& session_options)
 #ifdef _WIN32
-    : session_(env, std::wstring(model_path.begin(), model_path.end()).c_str(), Ort::SessionOptions{nullptr}) {
+    : session_(env, std::wstring(model_path.begin(), model_path.end()).c_str(), session_options) {
 #else
-    : session_(env, model_path.c_str(), Ort::SessionOptions{nullptr}) {
+    : session_(env, model_path.c_str(), session_options) {
 #endif
 
     size_t num_input = session_.GetInputCount();
@@ -34,28 +34,31 @@ cv::Mat TextDetector::preprocess(const cv::Mat& img, float& ratio_h, float& rati
 
     float ratio = 1.0f;
     if (std::max(h, w) > max_side_len) {
-        ratio = max_side_len * 1.0f / std::max(h, w);
+        ratio = max_side_len * 1.0f / std::max(h, w);//计算缩小比例，限制图片最大边长960
     }
 
+    //缩小图片尺寸
     int resize_h = int(h * ratio);
     int resize_w = int(w * ratio);
 
+    //保证是32的倍数，神经网络中有多次下采样（缩小 2 倍），32 的倍数能保证整除不出错。
     resize_h = (resize_h + 31) / 32 * 32;
     resize_w = (resize_w + 31) / 32 * 32;
 
-    cv::Mat resized;
-    cv::resize(img, resized, cv::Size(resize_w, resize_h));
+    cv::Mat result;
+    cv::resize(img, result, cv::Size(resize_w, resize_h));//像素值归一化把像素值从 [0, 255] 整数转换为 [0, 1] 浮点数。
 
+    //计算图片缩小比例
     ratio_h = resize_h * 1.0f / h;
     ratio_w = resize_w * 1.0f / w;
 
-    resized.convertTo(resized, CV_32FC3, 1.0 / 255.0);
+    result.convertTo(result, CV_32FC3, 1.0 / 255.0);
 
-    cv::Mat normalized;
-    cv::subtract(resized, cv::Scalar(0.485, 0.456, 0.406), normalized);
-    cv::divide(normalized, cv::Scalar(0.229, 0.224, 0.225), normalized);
 
-    return normalized;
+    cv::subtract(result, cv::Scalar(0.485, 0.456, 0.406), result);
+    cv::divide(result, cv::Scalar(0.229, 0.224, 0.225), result);
+
+    return result;
 }
 
 std::vector<TextBox> TextDetector::postprocess(const cv::Mat& pred, float ratio_h, float ratio_w) {
@@ -90,12 +93,12 @@ std::vector<TextBox> TextDetector::postprocess(const cv::Mat& pred, float ratio_
         cv::Point2f vertices[4];
         box.points(vertices);
 
-        // 先映射回原图坐标
+        // 先映射回原图坐标，特征图坐标 → 原图坐标
         std::vector<cv::Point2f> mapped_pts;
         for (int i = 0; i < 4; i++) {
             cv::Point2f pt;
-            pt.x = vertices[i].x / ratio_w;
-            pt.y = vertices[i].y / ratio_h;
+            pt.x = vertices[i].x / ratio_w;//特征图x点除（特征图缩放比例*预处理缩放比例)
+            pt.y = vertices[i].y / ratio_h;//特征图y点除（特征图缩放比例*预处理缩放比例)
             mapped_pts.push_back(pt);
         }
 
@@ -130,7 +133,7 @@ std::vector<TextBox> TextDetector::detect(const cv::Mat& img) {
     cv::Mat input = preprocess(img, ratio_h, ratio_w);
 
     std::vector<int64_t> input_shape = {1, 3, input.rows, input.cols};
-    size_t input_tensor_size = 1 * 3 * input.rows * input.cols;
+    size_t input_tensor_size = 1 * 3 * input.rows * input.cols;//代表图片的元素大小
     std::vector<float> input_tensor_values(input_tensor_size);
 
     std::vector<cv::Mat> channels(3);
