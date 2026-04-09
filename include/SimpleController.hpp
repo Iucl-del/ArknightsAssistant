@@ -34,6 +34,7 @@ public:
     // 视觉功能：不传 roi 则识别整张图，传入 roi 则只识别指定区域
     bool detect_text(const std::string& image_path, std::string& out_text,
                      std::optional<ROI> roi = std::nullopt);
+    // 文字检索：查找截图中是否有匹配文字
     bool find_text(const std::string& image_path, const std::string& target_text, cv::Point& out_pos);
 
     // 模板匹配（支持多模板轮询，预处理策略由 ImagePreprocessor::Strategy 指定）

@@ -13,7 +13,8 @@ SimpleController::SimpleController() {
     vision_api_ = std::make_unique<OcrPack>(
         model_dir + "ch_ppocr_det.onnx",
         model_dir + "ch_ppocr_rec.onnx",
-        dict_path
+        dict_path,
+        DeviceType::GPU
     );
 }
 

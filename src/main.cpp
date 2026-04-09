@@ -9,7 +9,7 @@
 int main() {
     // 初始化控制器
     SimpleController controller;
-    if (!controller.connect("/tmp/adb", "192.168.3.69", "5555")) {
+    if (!controller.connect("/tmp/adb", "192.168.3.43", "5555")) {
         std::cerr << "连接设备失败" << std::endl;
         return 1;
     }
@@ -22,6 +22,6 @@ int main() {
     std::string task_path = std::string(Config::PROJECT_ROOT_DIR) + "/resource/tasks/start_arknights.json";
     executor.submit(task_path, [&](){});
 
-
+    getchar();
     return 0;
 }

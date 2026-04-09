@@ -4,7 +4,8 @@ project(ArknightsAutoBot)
 set(CMAKE_CXX_STANDARD 20)
 set(PROJECT_ROOT_DIR "${CMAKE_SOURCE_DIR}")
 
-option(ORT_WITH_CUDA "使用带 CUDA 支持的 ONNX Runtime 预构建版本" OFF)
+# 先检测 CUDA，用于后续决定下载哪个版本的 ONNX Runtime
+find_package(CUDAToolkit QUIET)
 
 include(FetchContent)
 
@@ -18,7 +19,7 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/onnxruntime/lib" AND
     message(STATUS "[OnnxRuntime] 使用本地目录: ${CMAKE_SOURCE_DIR}/onnxruntime")
     set(ONNXRUNTIME_DIR "${CMAKE_SOURCE_DIR}/onnxruntime")
 else()
-    if(ORT_WITH_CUDA)
+    if(CUDAToolkit_FOUND)
         set(_ORT_SUFFIX "-gpu")
     else()
         set(_ORT_SUFFIX "")
@@ -96,8 +97,6 @@ endif()
 # Boost: Asio + Beast（HTTP/WebSocket）
 find_package(Boost CONFIG REQUIRED COMPONENTS system)
 
-find_package(CUDAToolkit QUIET)
-
 # ============================================================
 # Windows 编译选项
 # ============================================================
@@ -154,8 +153,9 @@ if(NOT WIN32)
 endif()
 
 if(CUDAToolkit_FOUND)
+    target_compile_definitions(ArknightsAutoBot PRIVATE USE_CUDA)
     target_link_libraries(ArknightsAutoBot PRIVATE CUDA::cudart)
-    message(STATUS "CUDA found: ${CUDAToolkit_VERSION}")
+    message(STATUS "CUDA found: ${CUDAToolkit_VERSION}, GPU 加速已启用")
 else()
     message(STATUS "CUDA not found, building CPU-only version")
 endif()

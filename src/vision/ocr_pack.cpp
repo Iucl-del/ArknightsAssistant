@@ -1,6 +1,26 @@
 #include "ocr_pack.h"
 #include <iostream>
 
+// 创建 SessionOptions，根据设备类型配置
+static Ort::SessionOptions createSessionOptions(DeviceType device) {
+    Ort::SessionOptions options;
+
+    if (device == DeviceType::GPU) {
+#ifdef USE_CUDA
+        OrtCUDAProviderOptions cuda_options{};
+        cuda_options.device_id = 0;
+        options.AppendExecutionProvider_CUDA(cuda_options);
+        std::cout << "[OcrPack] 使用 CUDA GPU 加速" << std::endl;
+#else
+        std::cerr << "[OcrPack] 警告: 未编译 CUDA 支持，回退到 CPU" << std::endl;
+#endif
+    } else {
+        std::cout << "[OcrPack] 使用 CPU 推理" << std::endl;
+    }
+
+    return options;
+}
+
 // 旋转裁剪图像函数
 cv::Mat getRotateCropImage(const cv::Mat& img, const std::vector<cv::Point2f>& box) {
     std::vector<cv::Point2f> pts = box;
@@ -47,13 +67,17 @@ cv::Mat getRotateCropImage(const cv::Mat& img, const std::vector<cv::Point2f>& b
 
 OcrPack::OcrPack(const std::string& det_model_path,
                  const std::string& rec_model_path,
-                 const std::string& dict_path) {
+                 const std::string& dict_path,
+                 DeviceType device) {
     // 初始化 ONNX Runtime 环境
     env_ = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "OcrPack");
 
+    // 根据设备类型创建 SessionOptions
+    Ort::SessionOptions session_options = createSessionOptions(device);
+
     // 初始化检测器和识别器
-    detector_ = std::make_unique<TextDetector>(*env_, det_model_path);
-    recognizer_ = std::make_unique<TextRecognizer>(*env_, rec_model_path, dict_path);
+    detector_ = std::make_unique<TextDetector>(*env_, det_model_path, session_options);
+    recognizer_ = std::make_unique<TextRecognizer>(*env_, rec_model_path, dict_path, session_options);
 }
 
 std::vector<std::pair<TextBox, std::string>> OcrPack::recognizeAll(const cv::Mat& img) {

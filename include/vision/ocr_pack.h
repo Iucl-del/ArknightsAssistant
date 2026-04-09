@@ -10,6 +10,14 @@
 #include "vision_types.h"
 
 /**
+ * @brief 推理设备类型
+ */
+enum class DeviceType {
+    CPU,    ///< 使用 CPU 推理
+    GPU    ///< 使用 CUDA GPU 加速
+};
+
+/**
  * @brief 旋转裁剪图像，用于提取检测到的文本区域
  * @param img 原始图像
  * @param box 四个角点坐标
@@ -29,10 +37,12 @@ public:
      * @param det_model_path 检测模型路径
      * @param rec_model_path 识别模型路径
      * @param dict_path 字典文件路径
+     * @param device 推理设备类型，默认 CPU
      */
     OcrPack(const std::string& det_model_path,
             const std::string& rec_model_path,
-            const std::string& dict_path);
+            const std::string& dict_path,
+            DeviceType device = DeviceType::CPU);
 
     /**
      * @brief 对图像进行完整的OCR识别（检测+识别）

@@ -19,8 +19,9 @@ public:
      * @brief 构造函数，加载ONNX文本检测模型
      * @param env ONNX Runtime环境
      * @param model_path 检测模型文件路径
+     * @param session_options 会话选项（可配置 CPU/GPU）
      */
-    TextDetector(Ort::Env& env, const std::string& model_path);
+    TextDetector(Ort::Env& env, const std::string& model_path, const Ort::SessionOptions& session_options);
 
     /**
      * @brief 检测输入图像中的文本区域
@@ -38,7 +39,7 @@ private:
     std::vector<const char*> output_names_; ///< 输出节点名称指针
 
     /**
-     * @brief 图像预处理，调整尺寸并归一化
+     * @brief 图像预处理，调整尺寸并归一化、标准化
      * @param img 输入图像
      * @param ratio_h 输出：高度缩放比例
      * @param ratio_w 输出：宽度缩放比例

@@ -45,7 +45,7 @@ private:
 
                 // 识别
                 node.recognition = n.get("recognition", "DirectHit").asString();
-                node.method = n.get("method", "Ccoeff").asString();
+
                 if (n.isMember("expected")) {
                     const auto& e = n["expected"];
                     if (e.isArray()) {
@@ -54,19 +54,19 @@ private:
                         node.expected.push_back(e.asString());
                     }
                 }
+
                 if (n.isMember("template")) {
                     const auto& t = n["template"];
                     if (t.isArray()) {
-                        for (const auto& v : t) {
-                            node.template_paths.push_back(v.asString());
-                        }
+                        for (const auto& v : t) node.template_paths.push_back(v.asString());
                     } else {
                         node.template_paths.push_back(t.asString());
                     }
                 }
+
                 node.threshold = n.get("threshold", 0.8).asDouble();
-                node.timeout = n.get("timeout", 20000).asInt();
-                node.interval = n.get("interval", 1000).asInt();
+                node.timeout = n.get("timeout", 10000).asInt();
+                node.interval = n.get("interval", 100).asInt();
 
                 // ROI: [x, y, w, h] 或 [x, y, w, h, base_w, base_h]
                 if (n.isMember("roi")) {
@@ -83,30 +83,6 @@ private:
                     }
                 }
 
-                // color_scales: 单个 [l0,l1,l2,u0,u1,u2] 或多个 [[...],[...]]
-                if (n.isMember("color_scales")) {
-                    const auto& cs = n["color_scales"];
-                    if (cs.isArray() && !cs.empty()) {
-                        if (cs[0].isArray()) {
-                            // 多组: [[l0,l1,l2,u0,u1,u2], ...]
-                            for (const auto& range : cs) {
-                                if (range.size() >= 6) {
-                                    ColorRange cr;
-                                    for (int i = 0; i < 3; ++i) cr.lower[i] = range[i].asInt();
-                                    for (int i = 0; i < 3; ++i) cr.upper[i] = range[3 + i].asInt();
-                                    node.color_scales.push_back(cr);
-                                }
-                            }
-                        } else if (cs.size() >= 6) {
-                            // 单组: [l0,l1,l2,u0,u1,u2]
-                            ColorRange cr;
-                            for (int i = 0; i < 3; ++i) cr.lower[i] = cs[i].asInt();
-                            for (int i = 0; i < 3; ++i) cr.upper[i] = cs[3 + i].asInt();
-                            node.color_scales.push_back(cr);
-                        }
-                    }
-                }
-
                 // 动作
                 node.action = n.get("action", "Click").asString();
                 if (n.isMember("target")) {
@@ -114,6 +90,7 @@ private:
                         node.target.push_back(v.asInt());
                     }
                 }
+                node.shell_cmd = n.get("shell_cmd", "").asString();
 
                 // 延迟
                 node.pre_delay = n.get("pre_delay", 0).asInt();
@@ -127,7 +104,6 @@ private:
                 config.nodes.emplace_back(std::move(node));
             }
         }
-
 
         return config;
     }
