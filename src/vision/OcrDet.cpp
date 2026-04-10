@@ -1,4 +1,4 @@
-#include "ocr_det.h"
+#include "OcrDet.hpp"
 #include <algorithm>
 
 TextDetector::TextDetector(Ort::Env& env, const std::string& model_path, const Ort::SessionOptions& session_options)

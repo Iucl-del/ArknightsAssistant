@@ -117,10 +117,14 @@ add_executable(ArknightsAutoBot
     src/adb/ADBClient.cpp
     src/SimpleController.cpp
     src/task/TaskExecutor.cpp
-    src/vision/ocr_det.cpp
-    src/vision/ocr_pack.cpp
-    src/vision/ocr_rec.cpp
-    src/vision/image_preprocessor.cpp
+    src/vision/OcrDet.cpp
+    src/vision/OcrPack.cpp
+    src/vision/OcrRec.cpp
+    src/vision/ImagePreprocessor.cpp
+    src/infrastructure/InfrastructureManager.cpp
+    src/infrastructure/SkillParser.cpp
+    src/infrastructure/EfficiencyCalculator.cpp
+    src/infrastructure/ScheduleOptimizer.cpp
 )
 
 target_include_directories(ArknightsAutoBot PRIVATE

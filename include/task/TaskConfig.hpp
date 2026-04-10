@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <optional>
-#include "vision/vision_types.h"
+#include "vision/VisionTypes.hpp"
 
 // ============================================================
 // 任务节点（平铺结构）

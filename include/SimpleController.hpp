@@ -6,9 +6,9 @@
 #include <atomic>
 
 #include "adb/ADBClient.hpp"
-#include "vision/ocr_pack.h"
-#include "vision/vision_types.h"
-#include "vision/image_preprocessor.h"
+#include "vision/OcrPack.hpp"
+#include "vision/VisionTypes.hpp"
+#include "vision/ImagePreprocessor.hpp"
 
 class TaskExecutor;
 
@@ -51,9 +51,9 @@ public:
 private:
     std::unique_ptr<ADBClient> controller_;
     std::unique_ptr<OcrPack> vision_api_;
+    std::shared_ptr<TaskExecutor> executor_;
     std::string device_address_;
     std::string work_dir_;
     std::string game_package_;
     std::atomic<int> screenshot_seq_{0};
-    std::shared_ptr<TaskExecutor> executor_;
 };

@@ -1,6 +1,6 @@
 #include "SimpleController.hpp"
 #include "Config.hpp"
-#include "vision/image_preprocessor.h"
+#include "vision/ImagePreprocessor.hpp"
 #include <thread>
 #include <chrono>
 #include <format>
@@ -128,6 +128,7 @@ bool SimpleController::find_text(const std::string& image_path, const std::strin
                 cx += pt.x;
                 cy += pt.y;
             }
+
             out_pos.x = static_cast<int>(cx / static_cast<float>(box.box.size()));
             out_pos.y = static_cast<int>(cy / static_cast<float>(box.box.size()));
             return true;

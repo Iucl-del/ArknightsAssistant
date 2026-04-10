@@ -1,4 +1,4 @@
-#include "image_preprocessor.h"
+#include "ImagePreprocessor.hpp"
 
 cv::Mat ImagePreprocessor::process(const cv::Mat& img, Strategy strategy) {
     switch (strategy) {

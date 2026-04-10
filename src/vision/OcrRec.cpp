@@ -1,4 +1,4 @@
-#include "ocr_rec.h"
+#include "OcrRec.hpp"
 #include <fstream>
 #include <iostream>
 

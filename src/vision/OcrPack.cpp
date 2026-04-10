@@ -1,4 +1,4 @@
-#include "ocr_pack.h"
+#include "OcrPack.hpp"
 #include <iostream>
 
 // 创建 SessionOptions，根据设备类型配置

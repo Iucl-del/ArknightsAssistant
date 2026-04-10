@@ -1,5 +1,5 @@
 #include "task/TaskExecutor.hpp"
-#include "vision/image_preprocessor.h"
+#include "vision/ImagePreprocessor.hpp"
 #include <iostream>
 #include <chrono>
 
