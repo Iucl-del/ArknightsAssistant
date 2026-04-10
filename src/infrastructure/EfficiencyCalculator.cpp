@@ -1,0 +1,237 @@
+#include "infrastructure/EfficiencyCalculator.hpp"
+#include "infrastructure/InfrastructureManager.hpp"
+#include <iostream>
+
+EfficiencyCalculator::EfficiencyCalculator(const InfrastructureManager& manager)
+    : manager_(manager) {
+}
+
+double EfficiencyCalculator::evaluate(const InfrastructureState& state) {
+    // 创建可修改的副本
+    InfrastructureState eval_state = state;
+
+    // ===== Phase 1: 计算全局变量 =====
+    compute_global_variables(eval_state);
+    compute_production_lines(eval_state);
+
+    // ===== Phase 2: 计算各设施效率 =====
+    double total = 0.0;
+
+    for (const auto& [fac_id, operators] : eval_state.assignments) {
+        auto it = manager_.get_facilities().find(fac_id);
+        if (it == manager_.get_facilities().end()) continue;
+
+        const auto& facility = it->second;
+
+        // 只计算生产设施
+        if (facility.type == "贸易站" ||
+            facility.type == "制造站" ||
+            facility.type == "发电站") {
+            total += evaluate_facility(fac_id, operators, eval_state);
+        }
+    }
+
+    return total;
+}
+
+double EfficiencyCalculator::evaluate_facility(
+    const std::string& facility_id,
+    const std::vector<std::string>& operators,
+    const InfrastructureState& state
+) {
+    double efficiency = 0.0;
+
+    auto fac_it = manager_.get_facilities().find(facility_id);
+    if (fac_it == manager_.get_facilities().end()) return 0.0;
+
+    const auto& facility = fac_it->second;
+
+    for (const auto& op_id : operators) {
+        auto op_it = manager_.get_operators().find(op_id);
+        if (op_it == manager_.get_operators().end()) continue;
+
+        const auto& op = op_it->second;
+
+        for (const auto& skill : op.parsed_skills) {
+            // 检查技能是否适用于当前设施
+            if (skill.facility != facility.type) continue;
+
+            // 检查是否解锁
+            if (op.elite < skill.unlock_elite) continue;
+            if (op.elite == skill.unlock_elite && op.level < skill.unlock_level) continue;
+
+            // 计算该技能的所有效果
+            for (const auto& effect : skill.effects) {
+                switch (effect.type) {
+                    case SkillEffectType::FLAT_BONUS:
+                        efficiency += calc_flat_bonus(effect);
+                        break;
+
+                    case SkillEffectType::PER_OPERATOR_BONUS:
+                        efficiency += calc_per_operator_bonus(effect, operators);
+                        break;
+
+                    case SkillEffectType::PER_PRODUCTION_LINE:
+                        efficiency += calc_per_line_bonus(effect, state);
+                        break;
+
+                    case SkillEffectType::SYNERGY_SPECIFIC:
+                        efficiency += calc_synergy_specific(effect, operators);
+                        break;
+
+                    case SkillEffectType::SYNERGY_GROUP:
+                        efficiency += calc_synergy_group(effect, operators);
+                        break;
+
+                    case SkillEffectType::VARIABLE_CONSUME:
+                        efficiency += calc_variable_consume(effect, state);
+                        break;
+
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+
+    return efficiency;
+}
+
+double EfficiencyCalculator::calc_flat_bonus(const SkillEffect& effect) {
+    return effect.value;
+}
+
+double EfficiencyCalculator::calc_per_operator_bonus(
+    const SkillEffect& effect,
+    const std::vector<std::string>& operators
+) {
+    int count = count_group_members(operators, effect.condition_group);
+    if (effect.condition_count <= 0) return 0.0;
+    return effect.value * (count / effect.condition_count);
+}
+
+double EfficiencyCalculator::calc_per_line_bonus(
+    const SkillEffect& effect,
+    const InfrastructureState& state
+) {
+    int lines = 0;
+    if (effect.production_type == "gold") {
+        lines = state.gold_lines;
+    } else if (effect.production_type == "record") {
+        lines = state.record_lines;
+    } else if (effect.production_type == "chip") {
+        lines = state.chip_lines;
+    }
+
+    if (effect.condition_count <= 0) return 0.0;
+    return effect.value * (lines / effect.condition_count);
+}
+
+double EfficiencyCalculator::calc_synergy_specific(
+    const SkillEffect& effect,
+    const std::vector<std::string>& operators
+) {
+    // 检查目标干员是否在同设施
+    for (const auto& op_id : operators) {
+        if (is_operator_by_name(op_id, effect.condition_operator)) {
+            return effect.value;
+        }
+    }
+    return 0.0;
+}
+
+double EfficiencyCalculator::calc_synergy_group(
+    const SkillEffect& effect,
+    const std::vector<std::string>& operators
+) {
+    // 检查是否有同组织干员
+    for (const auto& op_id : operators) {
+        if (is_same_group(op_id, effect.condition_group)) {
+            return effect.value;
+        }
+    }
+    return 0.0;
+}
+
+double EfficiencyCalculator::calc_variable_consume(
+    const SkillEffect& effect,
+    const InfrastructureState& state
+) {
+    auto it = state.variables.find(effect.variable_name);
+    if (it == state.variables.end()) return 0.0;
+
+    double var_value = it->second;
+    if (effect.condition_count <= 0) return 0.0;
+    return effect.value * (var_value / effect.condition_count);
+}
+
+void EfficiencyCalculator::compute_global_variables(InfrastructureState& state) {
+    state.variables.clear();
+
+    // 遍历所有分配，计算变量产生
+    for (const auto& [fac_id, operators] : state.assignments) {
+        for (const auto& op_id : operators) {
+            auto op_it = manager_.get_operators().find(op_id);
+            if (op_it == manager_.get_operators().end()) continue;
+
+            const auto& op = op_it->second;
+
+            for (const auto& skill : op.parsed_skills) {
+                // 检查是否解锁
+                if (op.elite < skill.unlock_elite) continue;
+                if (op.elite == skill.unlock_elite && op.level < skill.unlock_level) continue;
+
+                for (const auto& effect : skill.effects) {
+                    if (effect.type == SkillEffectType::VARIABLE_PRODUCE) {
+                        state.variables[effect.variable_name] += effect.value;
+                    }
+                }
+            }
+        }
+    }
+}
+
+void EfficiencyCalculator::compute_production_lines(InfrastructureState& state) {
+    // 统计各类生产线数量
+    // 简化处理：假设制造站配置由外部提供
+    // 这里暂时使用默认值（252配置：5个制造站）
+    state.gold_lines = 4;     // 4条赤金
+    state.record_lines = 1;   // 1条作战记录
+    state.chip_lines = 0;     // 0条芯片
+}
+
+bool EfficiencyCalculator::is_same_group(const std::string& op_id, const std::string& group_name) {
+    auto op_it = manager_.get_operators().find(op_id);
+    if (op_it == manager_.get_operators().end()) return false;
+
+    const auto& op = op_it->second;
+
+    // 通过 group_id 匹配
+    auto name_it = NAME_TO_GROUP_ID.find(group_name);
+    if (name_it != NAME_TO_GROUP_ID.end()) {
+        return op.meta.group_id == name_it->second;
+    }
+
+    // 直接比较 group_id
+    return op.meta.group_id == group_name;
+}
+
+bool EfficiencyCalculator::is_operator_by_name(const std::string& op_id, const std::string& target_name) {
+    auto op_it = manager_.get_operators().find(op_id);
+    if (op_it == manager_.get_operators().end()) return false;
+
+    return op_it->second.name == target_name;
+}
+
+int EfficiencyCalculator::count_group_members(
+    const std::vector<std::string>& operators,
+    const std::string& group_name
+) {
+    int count = 0;
+    for (const auto& op_id : operators) {
+        if (is_same_group(op_id, group_name)) {
+            count++;
+        }
+    }
+    return count;
+}
