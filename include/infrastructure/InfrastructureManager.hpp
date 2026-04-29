@@ -2,7 +2,6 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <optional>
 #include <set>
 #include <json/json.h>
 #include "SkillEffect.hpp"
@@ -37,6 +36,7 @@ struct OperatorInfo {
  */
 struct FacilityInfo {
     std::string type;               // 设施类型: 贸易站|制造站|发电站|控制中枢|宿舍|...
+    std::string production_type;    // 生产类型: "gold"(赤金)|"record"(作战记录)|"chip"(芯片)|"lmd"(龙门币)|""(无)
     int level;                      // 设施等级 (1-3)
     int slots;                      // 干员槽位数
     std::vector<std::string> operators;  // 当前入驻干员ID列表
@@ -89,13 +89,7 @@ class SimpleController;
 class InfrastructureManager {
 public:
     explicit InfrastructureManager(SimpleController& controller);
-
-    /**
-     * @brief 加载干员技能数据库
-     * @param path JSON文件路径 (operator_skills.json)
-     * @return 是否加载成功
-     */
-    bool load_skill_database(const std::string& path);
+    ~InfrastructureManager() = default;
 
     /**
      * @brief 从森空岛导入干员数据
@@ -113,10 +107,9 @@ public:
      * }
      * ```
      *
-     * @param path 森空岛导出的JSON文件路径
      * @return 是否导入成功
      */
-    bool import_operators_from_skland(const std::string& path);
+    bool import_operators_from_skland();
 
     /**
      * @brief 使用全部干员进行测试
@@ -181,18 +174,18 @@ public:
 
 private:
     /**
-     * @brief 解析技能数据JSON
+     * @brief 加载干员技能数据库
      *
-     * 从JSON加载干员信息，并使用 SkillParser 解析技能描述为结构化数据。
+     * 从固定路径 resource/data/operator_skills.json 加载并解析。
+     * 在构造函数中自动调用。
      *
-     * @param root JSON根节点
-     * @return 是否解析成功
+     * @return 是否加载成功
      */
-    bool parse_skill_json(const Json::Value& root);
+    bool load_skill_database();
 
     SimpleController& controller_;
-
     std::map<std::string, OperatorInfo> skill_db_;      // 技能数据库（所有干员）
     std::map<std::string, OperatorInfo> my_operators_;  // 当前账号拥有的干员
     std::map<std::string, FacilityInfo> facilities_;    // 当前基建设施
+
 };

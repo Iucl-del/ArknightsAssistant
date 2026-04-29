@@ -14,6 +14,7 @@ enum class SkillEffectType {
     // ===== 条件类型 =====
     PER_OPERATOR_BONUS,      ///< 按干员数量: "每个[格拉斯哥帮]干员+5%"
     PER_PRODUCTION_LINE,     ///< 按生产线: "每条赤金生产线+5%"
+    PER_FACILITY_GLOBAL,     ///< 按全局设施数量: "每有一间进驻精英干员的设施+2%"
 
     // ===== 联动类型 =====
     SYNERGY_SPECIFIC,        ///< 特定干员联动: "与德克萨斯一起工作时+65%"
@@ -55,6 +56,10 @@ struct SkillEffect {
 
     // ===== 生产线相关字段 =====
     std::string production_type;    ///< 生产类型: "gold"(赤金), "record"(作战记录), "chip"(芯片)
+
+    // ===== 设施计数相关字段 =====
+    std::string facility_condition; ///< 设施条件: "elite"(精英干员), 组织名等
+    int max_count = 0;              ///< 最大生效数量（0=无上限）
 };
 
 /**

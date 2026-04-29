@@ -99,7 +99,19 @@ private:
      */
     std::optional<SkillEffect> parse_variable_consume(const std::string& desc, const std::string& facility);
 
+    /**
+     * @brief 解析全局设施计数加成
+     *
+     * 匹配模式: "每有一间进驻精英干员的设施+N%（最多M间）"
+     */
+    std::optional<SkillEffect> parse_per_facility_global(const std::string& desc, const std::string& facility);
+
     // ===== 辅助方法 =====
+
+    /**
+     * @brief 按分号分割描述为多个子句
+     */
+    std::vector<std::string> split_clauses(const std::string& desc);
 
     /**
      * @brief 从文本中提取百分比数值

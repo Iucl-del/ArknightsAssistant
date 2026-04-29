@@ -87,6 +87,10 @@ double EfficiencyCalculator::evaluate_facility(
                         efficiency += calc_variable_consume(effect, state);
                         break;
 
+                    case SkillEffectType::PER_FACILITY_GLOBAL:
+                        efficiency += calc_per_facility_global(effect, state);
+                        break;
+
                     default:
                         break;
                 }
@@ -192,12 +196,16 @@ void EfficiencyCalculator::compute_global_variables(InfrastructureState& state) 
 }
 
 void EfficiencyCalculator::compute_production_lines(InfrastructureState& state) {
-    // 统计各类生产线数量
-    // 简化处理：假设制造站配置由外部提供
-    // 这里暂时使用默认值（252配置：5个制造站）
-    state.gold_lines = 4;     // 4条赤金
-    state.record_lines = 1;   // 1条作战记录
-    state.chip_lines = 0;     // 0条芯片
+    state.gold_lines = 0;
+    state.record_lines = 0;
+    state.chip_lines = 0;
+
+    for (const auto& [fac_id, fac] : manager_.get_facilities()) {
+        if (fac.type != "制造站") continue;
+        if (fac.production_type == "gold") state.gold_lines++;
+        else if (fac.production_type == "record") state.record_lines++;
+        else if (fac.production_type == "chip") state.chip_lines++;
+    }
 }
 
 bool EfficiencyCalculator::is_same_group(const std::string& op_id, const std::string& group_name) {

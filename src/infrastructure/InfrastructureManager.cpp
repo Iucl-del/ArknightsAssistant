@@ -2,15 +2,20 @@
 #include "infrastructure/SkillParser.hpp"
 #include "infrastructure/ScheduleOptimizer.hpp"
 #include "SimpleController.hpp"
+#include "Config.hpp"
 #include <fstream>
 #include <iostream>
 #include <algorithm>
+#include <cstdlib>
+#include <filesystem>
 
 InfrastructureManager::InfrastructureManager(SimpleController& controller)
     : controller_(controller) {
+    load_skill_database();
 }
 
-bool InfrastructureManager::load_skill_database(const std::string& path) {
+bool InfrastructureManager::load_skill_database() {
+    std::string path = std::string(Config::PROJECT_ROOT_DIR) + "/resource/data/operator_skills.json";
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "[Infrastructure] 无法打开技能数据库: " << path << std::endl;
@@ -26,15 +31,6 @@ bool InfrastructureManager::load_skill_database(const std::string& path) {
         return false;
     }
 
-    if (!parse_skill_json(root)) {
-        return false;
-    }
-
-    std::cout << "[Infrastructure] 加载技能数据库完成，干员数量: " << skill_db_.size() << std::endl;
-    return true;
-}
-
-bool InfrastructureManager::parse_skill_json(const Json::Value& root) {
     SkillParser parser;
 
     for (const auto& char_id : root.getMemberNames()) {
@@ -74,13 +70,61 @@ bool InfrastructureManager::parse_skill_json(const Json::Value& root) {
         skill_db_[char_id] = op;
     }
 
+    std::cout << "[Infrastructure] 加载技能数据库完成，干员数量: " << skill_db_.size() << std::endl;
     return true;
 }
 
-bool InfrastructureManager::import_operators_from_skland(const std::string& path) {
-    std::ifstream file(path);
+bool InfrastructureManager::import_operators_from_skland() {
+    // 调用 Python 脚本获取干员数据
+    std::string root_dir = Config::PROJECT_ROOT_DIR;
+    std::string script = root_dir + "/scripts/get_operators.py";
+
+    if (!std::filesystem::exists(script)) {
+        std::cerr << "[Infrastructure] 脚本不存在: " << script << std::endl;
+        return false;
+    }
+
+    std::string command = "python \"" + script + "\"";
+    std::cout << "[Infrastructure] 执行脚本: " << command << std::endl;
+
+    int ret = std::system(command.c_str());
+    if (ret != 0) {
+        std::cerr << "[Infrastructure] 脚本执行失败，返回码: " << ret << std::endl;
+        return false;
+    }
+
+    // 查找 resource/data 下最新的 player_full_*.json
+    std::filesystem::path data_dir = std::filesystem::path(root_dir) / "resource" / "data";
+    if (!std::filesystem::exists(data_dir)) {
+        std::cerr << "[Infrastructure] 数据目录不存在: " << data_dir.string() << std::endl;
+        return false;
+    }
+
+    std::filesystem::path latest;
+    std::filesystem::file_time_type latest_time{};
+
+    for (const auto& entry : std::filesystem::directory_iterator(data_dir)) {
+        auto filename = entry.path().filename().string();
+        if (filename.starts_with("player_full_") && filename.ends_with(".json")) {
+            auto ftime = entry.last_write_time();
+            if (latest.empty() || ftime > latest_time) {
+                latest = entry.path();
+                latest_time = ftime;
+            }
+        }
+    }
+
+    if (latest.empty()) {
+        std::cerr << "[Infrastructure] 未找到生成的干员数据文件" << std::endl;
+        return false;
+    }
+
+    std::cout << "[Infrastructure] 干员数据文件: " << latest.string() << std::endl;
+
+    // 解析干员数据
+    std::ifstream file(latest);
     if (!file.is_open()) {
-        std::cerr << "[Infrastructure] 无法打开森空岛数据文件: " << path << std::endl;
+        std::cerr << "[Infrastructure] 无法打开森空岛数据文件: " << latest.string() << std::endl;
         return false;
     }
 
@@ -156,28 +200,27 @@ bool InfrastructureManager::scan_infrastructure() {
     // 2. 识别设施类型和等级
     // 3. 识别当前入驻干员
 
-    std::cout << "[Infrastructure] scan_infrastructure() 待实现，使用默认252布局" << std::endl;
+    std::cout << "[Infrastructure] scan_infrastructure() 待实现，使用默认242布局" << std::endl;
 
-    // 默认基建布局（252配置）
-    facilities_["trading_1"] = {"贸易站", 3, 3, {}};
-    facilities_["trading_2"] = {"贸易站", 3, 3, {}};
-    facilities_["manufact_1"] = {"制造站", 3, 3, {}};
-    facilities_["manufact_2"] = {"制造站", 3, 3, {}};
-    facilities_["manufact_3"] = {"制造站", 3, 3, {}};
-    facilities_["manufact_4"] = {"制造站", 3, 3, {}};
-    facilities_["manufact_5"] = {"制造站", 3, 3, {}};
-    facilities_["power_1"] = {"发电站", 3, 1, {}};
-    facilities_["power_2"] = {"发电站", 3, 1, {}};
-    facilities_["power_3"] = {"发电站", 3, 1, {}};
-    facilities_["control"] = {"控制中枢", 5, 5, {}};
-    facilities_["dormitory_1"] = {"宿舍", 5, 5, {}};
-    facilities_["dormitory_2"] = {"宿舍", 5, 5, {}};
-    facilities_["dormitory_3"] = {"宿舍", 5, 5, {}};
-    facilities_["dormitory_4"] = {"宿舍", 5, 5, {}};
-    facilities_["meeting"] = {"会客室", 3, 2, {}};
-    facilities_["workshop"] = {"加工站", 3, 1, {}};
-    facilities_["training"] = {"训练室", 3, 1, {}};
-    facilities_["hire"] = {"办公室", 3, 1, {}};
+    // 默认基建布局（242配置：2赤金+2作战记录）
+    facilities_["trading_1"] = {"贸易站", "lmd", 3, 3, {}};
+    facilities_["trading_2"] = {"贸易站", "lmd", 3, 3, {}};
+    facilities_["manufact_1"] = {"制造站", "gold", 3, 3, {}};
+    facilities_["manufact_2"] = {"制造站", "gold", 3, 3, {}};
+    facilities_["manufact_3"] = {"制造站", "record", 3, 3, {}};
+    facilities_["manufact_4"] = {"制造站", "record", 3, 3, {}};
+    facilities_["power_1"] = {"发电站", "", 3, 1, {}};
+    facilities_["power_2"] = {"发电站", "", 3, 1, {}};
+    facilities_["power_3"] = {"发电站", "", 3, 1, {}};
+    facilities_["control"] = {"控制中枢", "", 5, 5, {}};
+    facilities_["dormitory_1"] = {"宿舍", "", 5, 5, {}};
+    facilities_["dormitory_2"] = {"宿舍", "", 5, 5, {}};
+    facilities_["dormitory_3"] = {"宿舍", "", 5, 5, {}};
+    facilities_["dormitory_4"] = {"宿舍", "", 5, 5, {}};
+    facilities_["meeting"] = {"会客室", "", 3, 2, {}};
+    facilities_["workshop"] = {"加工站", "", 3, 1, {}};
+    facilities_["training"] = {"训练室", "", 3, 1, {}};
+    facilities_["hire"] = {"办公室", "", 3, 1, {}};
 
     return true;
 }
@@ -197,7 +240,43 @@ SchedulePlan InfrastructureManager::optimize() {
     config.replace_weight = 0.2;
     config.plateau_threshold = 1000;
 
-    return optimizer.optimize(config);
+    auto plan = optimizer.optimize(config);
+
+    // 打印排班结果
+    std::cout << "\n" << std::string(60, '=') << std::endl;
+    std::cout << "[Infrastructure] 排班优化完成" << std::endl;
+    std::cout << "  迭代次数: " << plan.iterations
+              << "  耗时: " << plan.optimization_time_ms << "ms"
+              << "  总效率: " << plan.total_efficiency << std::endl;
+    std::cout << std::string(60, '-') << std::endl;
+
+    for (const auto& assignment : plan.assignments) {
+        std::cout << "  " << assignment.facility_type
+                  << " [" << assignment.facility_id << "]";
+
+        // 显示生产类型
+        auto fac_it = facilities_.find(assignment.facility_id);
+        if (fac_it != facilities_.end() && !fac_it->second.production_type.empty()) {
+            const auto& pt = fac_it->second.production_type;
+            std::string pt_name = pt == "gold" ? "赤金" : pt == "record" ? "作战记录" : pt == "chip" ? "芯片" : pt == "lmd" ? "龙门币" : pt;
+            std::cout << " (" << pt_name << ")";
+        }
+
+        std::cout << "  效率: +" << (assignment.total_efficiency * 100) << "%" << std::endl;
+        std::cout << "    干员: ";
+        for (size_t i = 0; i < assignment.operator_ids.size(); ++i) {
+            const auto& op_id = assignment.operator_ids[i];
+            if (my_operators_.contains(op_id)) {
+                if (i > 0) std::cout << ", ";
+                std::cout << my_operators_.at(op_id).name;
+            }
+        }
+        std::cout << std::endl;
+    }
+
+    std::cout << std::string(60, '=') << std::endl;
+
+    return plan;
 }
 
 bool InfrastructureManager::apply(const SchedulePlan& plan) {

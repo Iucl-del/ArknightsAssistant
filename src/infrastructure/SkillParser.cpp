@@ -5,43 +5,58 @@ std::vector<SkillEffect> SkillParser::parse(const std::string& desc,
                                             const std::string& facility) {
     std::vector<SkillEffect> effects;
 
-    // 按优先级尝试解析各种模式
-    // 一个描述可能包含多个效果，如："生产力+25%，人间烟火+10"
+    // 按分号分割描述，对每个子句独立解析
+    // 例如: "订单获取效率+20%；当与能天使在同一个贸易站时，额外+25%"
+    // 分割为两个子句分别解析
+    auto clauses = split_clauses(desc);
 
-    if (auto e = parse_flat_bonus(desc, facility)) {
-        effects.push_back(*e);
-    }
+    for (const auto& clause : clauses) {
+        if (auto e = parse_flat_bonus(clause, facility)) {
+            effects.push_back(*e);
+        }
 
-    if (auto e = parse_per_operator(desc, facility)) {
-        effects.push_back(*e);
-    }
+        if (auto e = parse_per_operator(clause, facility)) {
+            effects.push_back(*e);
+        }
 
-    if (auto e = parse_per_production_line(desc, facility)) {
-        effects.push_back(*e);
-    }
+        if (auto e = parse_per_production_line(clause, facility)) {
+            effects.push_back(*e);
+        }
 
-    if (auto e = parse_synergy_specific(desc, facility)) {
-        effects.push_back(*e);
-    }
+        if (auto e = parse_per_facility_global(clause, facility)) {
+            effects.push_back(*e);
+        }
 
-    if (auto e = parse_synergy_group(desc, facility)) {
-        effects.push_back(*e);
-    }
+        if (auto e = parse_synergy_specific(clause, facility)) {
+            effects.push_back(*e);
+        }
 
-    if (auto e = parse_variable_produce(desc, facility)) {
-        effects.push_back(*e);
-    }
+        if (auto e = parse_synergy_group(clause, facility)) {
+            effects.push_back(*e);
+        }
 
-    if (auto e = parse_variable_consume(desc, facility)) {
-        effects.push_back(*e);
+        if (auto e = parse_variable_produce(clause, facility)) {
+            effects.push_back(*e);
+        }
+
+        if (auto e = parse_variable_consume(clause, facility)) {
+            effects.push_back(*e);
+        }
     }
 
     return effects;
 }
 
 // 固定加成: "生产力+30%", "订单获取效率+35%", "无人机充能速度+10%"
+// 排除带条件的子句（联动、按人数等由其他解析器处理）
 std::optional<SkillEffect> SkillParser::parse_flat_bonus(const std::string& desc,
                                                          const std::string& facility) {
+    // 子句中包含条件关键词时，不作为无条件加成
+    static const std::regex condition_pattern(R"(当与|与[^】\]]*同一|每[有个条]|每\d+点)");
+    if (std::regex_search(desc, condition_pattern)) {
+        return std::nullopt;
+    }
+
     // 匹配模式：生产力/效率/速度 + 数字%
     static const std::regex pattern(
         R"((生产力|订单获取效率|贸易站效率|效率|无人机充能速度|充能速度|线索搜集速度)[+＋](\d+)%)"
@@ -207,4 +222,73 @@ std::string SkillParser::extract_bracket_content(const std::string& text) {
         return match[1].str();
     }
     return "";
+}
+
+// 全局设施计数加成: "每有一间进驻精英干员的设施，订单获取效率额外+2%（最多10间）"
+std::optional<SkillEffect> SkillParser::parse_per_facility_global(const std::string& desc,
+                                                                   const std::string& facility) {
+    // 匹配: 每有(一/1)间...精英干员...设施...+N%...最多M间
+    static const std::regex pattern(
+        R"(每有[一1]间[^+＋]*(精英干员|[^\s，,]+干员)[的]?设施[^+＋]*[+＋](\d+)%)"
+    );
+
+    std::smatch match;
+    if (std::regex_search(desc, match, pattern)) {
+        SkillEffect effect;
+        effect.type = SkillEffectType::PER_FACILITY_GLOBAL;
+        effect.facility = facility;
+        effect.value = std::stod(match[2].str()) / 100.0;
+
+        // 解析条件类型
+        std::string cond = match[1].str();
+        if (cond == "精英干员") {
+            effect.facility_condition = "elite";
+        } else {
+            // 其他条件如"岁干员" -> 提取组织名
+            effect.facility_condition = cond.substr(0, cond.find("干员"));
+        }
+
+        // 提取最大数量限制
+        static const std::regex max_pattern(R"(最多(\d+)间)");
+        std::smatch max_match;
+        if (std::regex_search(desc, max_match, max_pattern)) {
+            effect.max_count = std::stoi(max_match[1].str());
+        }
+
+        return effect;
+    }
+    return std::nullopt;
+}
+
+std::vector<std::string> SkillParser::split_clauses(const std::string& desc) {
+    std::vector<std::string> clauses;
+    std::string current;
+
+    for (size_t i = 0; i < desc.size(); ) {
+        // 检查中文分号 "；" (UTF-8: 0xEF 0xBC 0x9B)
+        if (i + 2 < desc.size() &&
+            static_cast<unsigned char>(desc[i]) == 0xEF &&
+            static_cast<unsigned char>(desc[i+1]) == 0xBC &&
+            static_cast<unsigned char>(desc[i+2]) == 0x9B) {
+            if (!current.empty()) clauses.push_back(current);
+            current.clear();
+            i += 3;
+            continue;
+        }
+        // 检查英文分号 ";"
+        if (desc[i] == ';') {
+            if (!current.empty()) clauses.push_back(current);
+            current.clear();
+            i++;
+            continue;
+        }
+        current += desc[i];
+        i++;
+    }
+    if (!current.empty()) clauses.push_back(current);
+
+    // 如果没有分号，返回原始描述
+    if (clauses.empty()) clauses.push_back(desc);
+
+    return clauses;
 }

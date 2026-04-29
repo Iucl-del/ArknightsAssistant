@@ -372,6 +372,10 @@ SchedulePlan ScheduleOptimizer::build_plan(const InfrastructureState& state, dou
     plan.iterations = stats_.total_iterations;
     plan.optimization_time_ms = stats_.time_ms;
 
+    // 构建带全局变量的评估状态
+    InfrastructureState eval_state = state;
+    calculator_.evaluate(eval_state);  // 填充 variables、production lines
+
     for (const auto& [fac_id, ops] : state.assignments) {
         auto fac_it = manager_.get_facilities().find(fac_id);
         if (fac_it == manager_.get_facilities().end()) continue;
@@ -380,6 +384,7 @@ SchedulePlan ScheduleOptimizer::build_plan(const InfrastructureState& state, dou
         assignment.facility_id = fac_id;
         assignment.facility_type = fac_it->second.type;
         assignment.operator_ids = ops;
+        assignment.total_efficiency = calculator_.evaluate_facility(fac_id, ops, eval_state);
 
         plan.assignments.push_back(assignment);
     }

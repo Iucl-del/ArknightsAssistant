@@ -4,7 +4,7 @@
 #include <chrono>
 
 
-TaskExecutor::TaskExecutor(std::shared_ptr<SimpleController> controller) : controller_(controller) {
+TaskExecutor::TaskExecutor(SimpleController& controller) : controller_(controller) {
     register_handlers();
 }
 
@@ -13,7 +13,7 @@ void TaskExecutor::register_handlers() {
     recognizers_["OCR"] = [this](const TaskNode& node, const std::string& screenshot) -> std::optional<cv::Point> {
         if (node.roi.has_value()) {
             std::string text;
-            if (!controller_->detect_text(screenshot, text, node.roi.value())) return std::nullopt;
+            if (!controller_.detect_text(screenshot, text, node.roi.value())) return std::nullopt;
             bool found = std::ranges::any_of(node.expected,
                 [&](const std::string& e) { return text.find(e) != std::string::npos; });
             if (found) {
@@ -24,7 +24,7 @@ void TaskExecutor::register_handlers() {
         } else {
             cv::Point pos;
             for (const auto& e : node.expected) {
-                if (controller_->find_text(screenshot, e, pos)) {
+                if (controller_.find_text(screenshot, e, pos)) {
                     return pos;
                 }
             }
@@ -34,7 +34,7 @@ void TaskExecutor::register_handlers() {
 
     recognizers_["TemplateMatch"] = [this](const TaskNode& node, const std::string& screenshot) -> std::optional<cv::Point> {
         cv::Point pos;
-        if (controller_->find_template_with_preprocess(screenshot, node.template_paths,
+        if (controller_.find_template_with_preprocess(screenshot, node.template_paths,
                 ImagePreprocessor::Strategy::NONE, node.threshold, pos)) {
             return pos;
         }
@@ -46,11 +46,11 @@ void TaskExecutor::register_handlers() {
         if (!node.target.empty() && node.target.size() >= 2) {
             cv::Point p(node.target[0], node.target[1]);
             std::cout << "  🖱️  点击 (" << p.x << ", " << p.y << ")" << std::endl;
-            return controller_->click(p);
+            return controller_.click(p);
         }
         if (pos.has_value()) {
             std::cout << "  🖱️  点击识别位置 (" << pos->x << ", " << pos->y << ")" << std::endl;
-            return controller_->click(pos.value());
+            return controller_.click(pos.value());
         }
         std::cerr << "  ❌ Click 缺少 target 或识别结果" << std::endl;
         return false;
@@ -62,7 +62,7 @@ void TaskExecutor::register_handlers() {
             cv::Point to(node.target[2], node.target[3]);
             int dur = node.target[4];
             std::cout << "  👆 滑动 (" << from.x << "," << from.y << ") -> (" << to.x << "," << to.y << ") " << dur << "ms" << std::endl;
-            return controller_->swipe(from, to, dur);
+            return controller_.swipe(from, to, dur);
         }
         std::cerr << "  ❌ Swipe 需要 target: [x1,y1,x2,y2,duration]" << std::endl;
         return false;
@@ -70,18 +70,18 @@ void TaskExecutor::register_handlers() {
 
     actions_["Shell"] = [this](const TaskNode& node, const std::optional<cv::Point>&) -> bool {
         std::cout << "  💻 Shell: " << node.shell_cmd << std::endl;
-        controller_->shell(node.shell_cmd);
+        controller_.shell(node.shell_cmd);
         return true;
     };
 
     actions_["StartApp"] = [this](const TaskNode&, const std::optional<cv::Point>&) -> bool {
         std::cout << "  📱 启动游戏" << std::endl;
-        return controller_->start_app();
+        return controller_.start_app();
     };
 
     actions_["StopApp"] = [this](const TaskNode&, const std::optional<cv::Point>&) -> bool {
         std::cout << "  📱 关闭游戏" << std::endl;
-        return controller_->stop_app();
+        return controller_.stop_app();
     };
 }
 
@@ -203,7 +203,7 @@ NodeResult TaskExecutor::execute_node(const TaskNode& node) {
     do {
         // pre_delay
         if (node.pre_delay > 0) {
-            controller_->wait(node.pre_delay);
+            controller_.wait(node.pre_delay);
         }
 
         std::optional<cv::Point> match_pos = std::nullopt;
@@ -230,7 +230,7 @@ NodeResult TaskExecutor::execute_node(const TaskNode& node) {
 
             while (running_.load() && DurationMs(std::chrono::steady_clock::now() - start).count() < node.timeout) {
                 attempt++;
-                std::string screenshot = controller_->auto_screenshot(node.recognition);
+                std::string screenshot = controller_.auto_screenshot(node.recognition);
                 if (screenshot.empty()) {
                     std::cerr << "  ❌ 截图失败" << std::endl;
                     return NodeResult::FAILED;
@@ -241,7 +241,7 @@ NodeResult TaskExecutor::execute_node(const TaskNode& node) {
                     std::cout << "  ✅ 识别成功 (第" << attempt << "次)" << std::endl;
                     break;
                 }
-                controller_->wait(node.interval);
+                controller_.wait(node.interval);
             }
 
             // 识别失败处理
@@ -276,7 +276,7 @@ NodeResult TaskExecutor::execute_node(const TaskNode& node) {
         // post_delay
         if (node.post_delay > 0) {
             std::cout << "  ⏳ post_delay " << node.post_delay << "ms" << std::endl;
-            controller_->wait(node.post_delay);
+            controller_.wait(node.post_delay);
         }
 
         round++;

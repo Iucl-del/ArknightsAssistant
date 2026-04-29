@@ -15,10 +15,8 @@ SimpleController::SimpleController() {
         model_dir + "ch_ppocr_det.onnx",
         model_dir + "ch_ppocr_rec.onnx",
         dict_path,
-        DeviceType::GPU
+        DeviceType::CPU
     );
-    auto self = shared_from_this();
-    executor_=std::make_shared<TaskExecutor>(self);
 }
 
 SimpleController::~SimpleController() = default;

@@ -28,7 +28,7 @@ using ActionHandler = std::function<bool(const TaskNode&, const std::optional<cv
 
 class TaskExecutor {
 public:
-    explicit TaskExecutor(std::shared_ptr<SimpleController> controller);
+    explicit TaskExecutor(SimpleController& controller);
     ~TaskExecutor();
 
     void start();
@@ -43,7 +43,7 @@ private:
     NodeResult execute_node(const TaskNode& node);
     void register_handlers();
 
-    std::shared_ptr<SimpleController> controller_;
+    SimpleController& controller_;
 
     std::queue<std::pair<std::string, TaskCallback>> task_queue_;
     mutable std::mutex queue_mutex_;

@@ -130,6 +130,18 @@ private:
     double calc_variable_consume(const SkillEffect& effect,
                                  const InfrastructureState& state);
 
+    /**
+     * @brief 计算全局设施计数加成
+     *
+     * 示例: "每有一间进驻精英干员的设施+2%（最多10间）"
+     *
+     * @param effect 技能效果
+     * @param state 基建状态
+     * @return 效率值
+     */
+    double calc_per_facility_global(const SkillEffect& effect,
+                                    const InfrastructureState& state);
+
     // ===== 全局状态计算 =====
 
     /**

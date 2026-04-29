@@ -9,10 +9,11 @@
 #include "vision/OcrPack.hpp"
 #include "vision/VisionTypes.hpp"
 #include "vision/ImagePreprocessor.hpp"
+#include "infrastructure/InfrastructureManager.hpp"
 
 class TaskExecutor;
 
-class SimpleController: public std::enable_shared_from_this<SimpleController> {
+class SimpleController {
 public:
     using Task = std::function<void(SimpleController&)>;
     SimpleController();
