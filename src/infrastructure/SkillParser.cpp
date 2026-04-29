@@ -68,6 +68,13 @@ std::optional<SkillEffect> SkillParser::parse_flat_bonus(const std::string& desc
         effect.type = SkillEffectType::FLAT_BONUS;
         effect.facility = facility;
         effect.value = std::stod(match[2].str()) / 100.0;
+        if (desc.find("贵金属类配方") != std::string::npos) {
+            effect.production_type = "gold";
+        } else if (desc.find("作战记录类配方") != std::string::npos) {
+            effect.production_type = "record";
+        } else if (desc.find("源石类配方") != std::string::npos) {
+            effect.production_type = "originium";
+        }
         return effect;
     }
     return std::nullopt;
@@ -77,12 +84,16 @@ std::optional<SkillEffect> SkillParser::parse_flat_bonus(const std::string& desc
 std::optional<SkillEffect> SkillParser::parse_per_operator(const std::string& desc,
                                                            const std::string& facility) {
     // 匹配模式：每(有/个)N个[组织名]干员...+X%
-    static const std::regex pattern(
+    static const std::regex bracket_pattern(
         R"(每[有个]?(\d*)[个名位]?(?:进驻[的在]?)?[【\[]([^\]】]+)[】\]][^+＋]*[+＋](\d+)%)"
+    );
+    static const std::regex plain_pattern(
+        R"(每有(\d+)名(.+)干员.*\+(\d+)%)"
     );
 
     std::smatch match;
-    if (std::regex_search(desc, match, pattern)) {
+    if (std::regex_search(desc, match, bracket_pattern) ||
+        std::regex_search(desc, match, plain_pattern)) {
         SkillEffect effect;
         effect.type = SkillEffectType::PER_OPERATOR_BONUS;
         effect.facility = facility;
@@ -129,12 +140,16 @@ std::optional<SkillEffect> SkillParser::parse_per_production_line(const std::str
 std::optional<SkillEffect> SkillParser::parse_synergy_specific(const std::string& desc,
                                                                 const std::string& facility) {
     // 匹配模式：与XXX(在)同一...+X%
-    static const std::regex pattern(
-        R"(与[【\[]?([^】\]\s]+?)[】\]]?(?:在)?同一[个]?(?:制造站|贸易站|发电站|设施|房间)?[^+＋]*[+＋](\d+)%)"
+    static const std::regex bracket_pattern(
+        R"(与[【\[]([^】\]]+)[】\]](?:在)?同一[个]?(?:制造站|贸易站|发电站|设施|房间)?[^+＋]*[+＋](\d+)%)"
+    );
+    static const std::regex plain_pattern(
+        R"(与(.+)在(?:同一个|同一)(?:制造站|贸易站|发电站|设施|房间)?.*\+(\d+)%)"
     );
 
     std::smatch match;
-    if (std::regex_search(desc, match, pattern)) {
+    if (std::regex_search(desc, match, bracket_pattern) ||
+        std::regex_search(desc, match, plain_pattern)) {
         SkillEffect effect;
         effect.type = SkillEffectType::SYNERGY_SPECIFIC;
         effect.facility = facility;

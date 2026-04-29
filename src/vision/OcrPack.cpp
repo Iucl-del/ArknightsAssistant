@@ -1,5 +1,23 @@
 #include "OcrPack.hpp"
+#include <algorithm>
 #include <iostream>
+#ifdef USE_CUDA
+#include <cuda_runtime.h>
+#endif
+
+static bool hasCudaExecutionProvider() {
+#ifndef USE_CUDA
+    return false;
+#else
+    int device_count = 0;
+    if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count <= 0) {
+        return false;
+    }
+
+    const auto providers = Ort::GetAvailableProviders();
+    return std::find(providers.begin(), providers.end(), "CUDAExecutionProvider") != providers.end();
+#endif
+}
 
 // 创建 SessionOptions，根据设备类型配置
 static Ort::SessionOptions createSessionOptions(DeviceType device) {
@@ -71,9 +89,14 @@ OcrPack::OcrPack(const std::string& det_model_path,
                  DeviceType device) {
     // 初始化 ONNX Runtime 环境
     env_ = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "OcrPack");
+    DeviceType actual_device = device;
+    if (device == DeviceType::GPU && !hasCudaExecutionProvider()) {
+        std::cerr << "[OcrPack] CUDAExecutionProvider 不可用，回退到 CPU" << std::endl;
+        actual_device = DeviceType::CPU;
+    }
 
     // 根据设备类型创建 SessionOptions
-    Ort::SessionOptions session_options = createSessionOptions(device);
+    Ort::SessionOptions session_options = createSessionOptions(actual_device);
 
     // 初始化检测器和识别器
     detector_ = std::make_unique<TextDetector>(*env_, det_model_path, session_options);
@@ -137,4 +160,3 @@ bool OcrPack::findTemplate(const cv::Mat& scene, const cv::Mat& templ,
     }
     return false;
 }
-

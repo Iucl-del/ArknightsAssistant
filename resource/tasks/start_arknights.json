@@ -25,7 +25,6 @@
       ],
       "threshold": 0.7,
       "action": "Click",
-      "timeout": 10000,
       "repeat_until_failed": true
     }
   ]

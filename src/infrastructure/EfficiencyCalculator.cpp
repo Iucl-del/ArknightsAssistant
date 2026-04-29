@@ -52,6 +52,7 @@ double EfficiencyCalculator::evaluate_facility(
 
         const auto& op = op_it->second;
 
+        const ParsedOperatorSkill* active_skill = nullptr;
         for (const auto& skill : op.parsed_skills) {
             // 检查技能是否适用于当前设施
             if (skill.facility != facility.type) continue;
@@ -60,40 +61,54 @@ double EfficiencyCalculator::evaluate_facility(
             if (op.elite < skill.unlock_elite) continue;
             if (op.elite == skill.unlock_elite && op.level < skill.unlock_level) continue;
 
-            // 计算该技能的所有效果
-            for (const auto& effect : skill.effects) {
-                switch (effect.type) {
-                    case SkillEffectType::FLAT_BONUS:
-                        efficiency += calc_flat_bonus(effect);
-                        break;
+            if (!active_skill ||
+                skill.unlock_elite > active_skill->unlock_elite ||
+                (skill.unlock_elite == active_skill->unlock_elite &&
+                 skill.unlock_level > active_skill->unlock_level)) {
+                active_skill = &skill;
+            }
+        }
 
-                    case SkillEffectType::PER_OPERATOR_BONUS:
-                        efficiency += calc_per_operator_bonus(effect, operators);
-                        break;
+        if (!active_skill) continue;
 
-                    case SkillEffectType::PER_PRODUCTION_LINE:
-                        efficiency += calc_per_line_bonus(effect, state);
-                        break;
+        // 同一干员同一设施只生效最高已解锁基建技能。
+        for (const auto& effect : active_skill->effects) {
+            if (!effect.production_type.empty() &&
+                effect.production_type != facility.production_type) {
+                continue;
+            }
 
-                    case SkillEffectType::SYNERGY_SPECIFIC:
-                        efficiency += calc_synergy_specific(effect, operators);
-                        break;
+            switch (effect.type) {
+                case SkillEffectType::FLAT_BONUS:
+                    efficiency += calc_flat_bonus(effect);
+                    break;
 
-                    case SkillEffectType::SYNERGY_GROUP:
-                        efficiency += calc_synergy_group(effect, operators);
-                        break;
+                case SkillEffectType::PER_OPERATOR_BONUS:
+                    efficiency += calc_per_operator_bonus(effect, operators);
+                    break;
 
-                    case SkillEffectType::VARIABLE_CONSUME:
-                        efficiency += calc_variable_consume(effect, state);
-                        break;
+                case SkillEffectType::PER_PRODUCTION_LINE:
+                    efficiency += calc_per_line_bonus(effect, state);
+                    break;
 
-                    case SkillEffectType::PER_FACILITY_GLOBAL:
-                        efficiency += calc_per_facility_global(effect, state);
-                        break;
+                case SkillEffectType::SYNERGY_SPECIFIC:
+                    efficiency += calc_synergy_specific(effect, operators);
+                    break;
 
-                    default:
-                        break;
-                }
+                case SkillEffectType::SYNERGY_GROUP:
+                    efficiency += calc_synergy_group(effect, operators);
+                    break;
+
+                case SkillEffectType::VARIABLE_CONSUME:
+                    efficiency += calc_variable_consume(effect, state);
+                    break;
+
+                case SkillEffectType::PER_FACILITY_GLOBAL:
+                    efficiency += calc_per_facility_global(effect, state);
+                    break;
+
+                default:
+                    break;
             }
         }
     }
@@ -169,6 +184,49 @@ double EfficiencyCalculator::calc_variable_consume(
     return effect.value * (var_value / effect.condition_count);
 }
 
+double EfficiencyCalculator::calc_per_facility_global(
+    const SkillEffect& effect,
+    const InfrastructureState& state
+) {
+    int matched_facilities = 0;
+
+    for (const auto& [fac_id, operators] : state.assignments) {
+        (void)fac_id;
+
+        bool facility_matches = false;
+        for (const auto& op_id : operators) {
+            auto op_it = manager_.get_operators().find(op_id);
+            if (op_it == manager_.get_operators().end()) continue;
+
+            const auto& op = op_it->second;
+
+            if (effect.facility_condition == "elite") {
+                // 精英化等级大于0视为精英干员
+                if (op.elite > 0) {
+                    facility_matches = true;
+                    break;
+                }
+            } else {
+                if (is_same_group(op_id, effect.facility_condition)) {
+                    facility_matches = true;
+                    break;
+                }
+            }
+        }
+
+        if (facility_matches) {
+            matched_facilities++;
+        }
+    }
+
+    if (effect.max_count > 0 && matched_facilities > effect.max_count) {
+        matched_facilities = effect.max_count;
+    }
+
+    if (effect.condition_count <= 0) return 0.0;
+    return effect.value * (matched_facilities / effect.condition_count);
+}
+
 void EfficiencyCalculator::compute_global_variables(InfrastructureState& state) {
     state.variables.clear();
 
@@ -217,18 +275,26 @@ bool EfficiencyCalculator::is_same_group(const std::string& op_id, const std::st
     // 通过 group_id 匹配
     auto name_it = NAME_TO_GROUP_ID.find(group_name);
     if (name_it != NAME_TO_GROUP_ID.end()) {
-        return op.meta.group_id == name_it->second;
+        const auto& id = name_it->second;
+        return op.meta.group_id == id ||
+               op.meta.nation_id == id ||
+               op.meta.team_id == id;
     }
 
-    // 直接比较 group_id
-    return op.meta.group_id == group_name;
+    // 直接比较内部 ID，兼容阵营、组织、小队字段
+    return op.meta.group_id == group_name ||
+           op.meta.nation_id == group_name ||
+           op.meta.team_id == group_name;
 }
 
 bool EfficiencyCalculator::is_operator_by_name(const std::string& op_id, const std::string& target_name) {
     auto op_it = manager_.get_operators().find(op_id);
     if (op_it == manager_.get_operators().end()) return false;
 
-    return op_it->second.name == target_name;
+    const auto& op_name = op_it->second.name;
+    if (op_name == target_name) return true;
+
+    return false;
 }
 
 int EfficiencyCalculator::count_group_members(

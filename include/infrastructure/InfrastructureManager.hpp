@@ -96,17 +96,6 @@ public:
      *
      * 从森空岛导出的JSON文件加载用户拥有的干员及其等级信息。
      * 森空岛数据包含干员ID、精英化等级、等级等信息。
-     *
-     * JSON格式示例:
-     * ```json
-     * {
-     *   "chars": [
-     *     {"charId": "char_002_amiya", "evolvePhase": 2, "level": 80},
-     *     {"charId": "char_102_texas", "evolvePhase": 2, "level": 90}
-     *   ]
-     * }
-     * ```
-     *
      * @return 是否导入成功
      */
     bool import_operators_from_skland();
@@ -124,7 +113,7 @@ public:
     /**
      * @brief 扫描当前基建布局
      * @return 是否扫描成功
-     * @note TODO: 待实现OCR识别，当前使用默认252布局
+     * @note TODO: 待实现OCR识别，当前使用默认243布局
      */
     bool scan_infrastructure();
 

@@ -32,6 +32,9 @@ inline const std::map<std::string, std::string> GROUP_ID_TO_NAME = {
     // 企鹅物流
     {"penguin", "企鹅物流"},
 
+    // 拉特兰
+    {"laterano", "拉特兰"},
+
     // 喀兰贸易
     {"karlan", "喀兰贸易"},
 
@@ -99,6 +102,7 @@ inline const std::map<std::string, std::string> NAME_TO_GROUP_ID = {
     {"罗德岛", "rhodes"},
     {"黑钢国际", "blacksteel"},
     {"企鹅物流", "penguin"},
+    {"拉特兰", "laterano"},
     {"喀兰贸易", "karlan"},
     {"深海猎人", "abyssal"},
     {"乌萨斯", "ursus"},

@@ -15,7 +15,7 @@ SimpleController::SimpleController() {
         model_dir + "ch_ppocr_det.onnx",
         model_dir + "ch_ppocr_rec.onnx",
         dict_path,
-        DeviceType::CPU
+        DeviceType::GPU
     );
 }
 

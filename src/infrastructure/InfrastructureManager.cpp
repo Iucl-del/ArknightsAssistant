@@ -200,7 +200,7 @@ bool InfrastructureManager::scan_infrastructure() {
     // 2. 识别设施类型和等级
     // 3. 识别当前入驻干员
 
-    std::cout << "[Infrastructure] scan_infrastructure() 待实现，使用默认242布局" << std::endl;
+    std::cout << "[Infrastructure] scan_infrastructure() 待实现，使用默认243布局" << std::endl;
 
     // 默认基建布局（242配置：2赤金+2作战记录）
     facilities_["trading_1"] = {"贸易站", "lmd", 3, 3, {}};

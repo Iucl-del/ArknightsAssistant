@@ -112,6 +112,16 @@ private:
      */
     InfrastructureState greedy_initialize();
 
+    /**
+     * @brief 粗略估计干员在设施中的潜在价值
+     *
+     * 用于初始解候选裁剪，避免纯联动干员因基础效率为0被排除。
+     */
+    double estimate_operator_potential(const OperatorInfo& op, const FacilityInfo& facility) const;
+
+    InfrastructureState improve_facility_type_assignments(const InfrastructureState& state,
+                                                          const std::string& facility_type);
+
     // ===== 邻域操作 =====
 
     /**
