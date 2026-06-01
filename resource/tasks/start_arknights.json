@@ -4,28 +4,35 @@
     {
       "recognition": "DirectHit",
       "action": "StartApp",
-      "post_delay": 7000
+      "post_delay": 10000
     },
     {
       "recognition": "TemplateMatch",
       "method": "Ccoeff",
-      "template": "resource/templates/START.png",
-      "action": "Click"
+      "template": [
+        "resource/templates/START.png"
+      ],
+      "action": "Click",
+      "timeout": 20000
     },
     {
       "recognition": "OCR",
       "expected": "开始唤醒",
-      "action": "Click"
+      "action": "Click",
+      "post_delay": 15000
     },
     {
       "recognition": "TemplateMatch",
       "method": "Grayscale",
+      "roi": [1120, 20, 140, 120],
       "template": [
-        "resource/templates/AnnouncementClose.png"
+        "resource/templates/AnnouncementClose.png",
+        "resource/templates/AnnouncementClose_circle_tight.png"
       ],
       "threshold": 0.7,
       "action": "Click",
-      "repeat_until_failed": true
+      "repeat_until_failed": true,
+      "timeout": 15000
     }
   ]
 }
