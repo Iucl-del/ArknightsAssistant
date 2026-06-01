@@ -1,6 +1,7 @@
 #include "OcrPack.hpp"
+#include "Logger.hpp"
 #include <algorithm>
-#include <iostream>
+#include <chrono>
 #ifdef USE_CUDA
 #include <cuda_runtime.h>
 #endif
@@ -19,7 +20,6 @@ static bool hasCudaExecutionProvider() {
 #endif
 }
 
-// 创建 SessionOptions，根据设备类型配置
 static Ort::SessionOptions createSessionOptions(DeviceType device) {
     Ort::SessionOptions options;
 
@@ -28,22 +28,20 @@ static Ort::SessionOptions createSessionOptions(DeviceType device) {
         OrtCUDAProviderOptions cuda_options{};
         cuda_options.device_id = 0;
         options.AppendExecutionProvider_CUDA(cuda_options);
-        std::cout << "[OcrPack] 使用 CUDA GPU 加速" << std::endl;
+        Logger::info("[OcrPack] 使用运行时推理后端");
 #else
-        std::cerr << "[OcrPack] 警告: 未编译 CUDA 支持，回退到 CPU" << std::endl;
+        Logger::warning("[OcrPack] CUDA 不可用，回退到 CPU");
 #endif
     } else {
-        std::cout << "[OcrPack] 使用 CPU 推理" << std::endl;
+        Logger::info("[OcrPack] 使用运行时推理后端");
     }
 
     return options;
 }
 
-// 旋转裁剪图像函数
 cv::Mat getRotateCropImage(const cv::Mat& img, const std::vector<cv::Point2f>& box) {
     std::vector<cv::Point2f> pts = box;
 
-    // 排序：左上、右上、右下、左下
     std::sort(pts.begin(), pts.end(), [](const cv::Point2f& a, const cv::Point2f& b) {
         return a.y < b.y;
     });
@@ -82,23 +80,19 @@ cv::Mat getRotateCropImage(const cv::Mat& img, const std::vector<cv::Point2f>& b
     return warped;
 }
 
-
 OcrPack::OcrPack(const std::string& det_model_path,
                  const std::string& rec_model_path,
                  const std::string& dict_path,
                  DeviceType device) {
-    // 初始化 ONNX Runtime 环境
-    env_ = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "OcrPack");
+    env_ = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_ERROR, "OcrPack");
     DeviceType actual_device = device;
     if (device == DeviceType::GPU && !hasCudaExecutionProvider()) {
-        std::cerr << "[OcrPack] CUDAExecutionProvider 不可用，回退到 CPU" << std::endl;
+        Logger::warning("[OcrPack] CUDA 不可用，回退到 CPU");
         actual_device = DeviceType::CPU;
     }
 
-    // 根据设备类型创建 SessionOptions
     Ort::SessionOptions session_options = createSessionOptions(actual_device);
 
-    // 初始化检测器和识别器
     detector_ = std::make_unique<TextDetector>(*env_, det_model_path, session_options);
     recognizer_ = std::make_unique<TextRecognizer>(*env_, rec_model_path, dict_path, session_options);
 }
@@ -106,10 +100,7 @@ OcrPack::OcrPack(const std::string& det_model_path,
 std::vector<std::pair<TextBox, std::string>> OcrPack::recognizeAll(const cv::Mat& img) {
     std::vector<std::pair<TextBox, std::string>> results;
 
-    // 1. 检测文本区域
     std::vector<TextBox> boxes = detector_->detect(img);
-
-    // 2. 对每个区域进行识别
     for (const auto& box : boxes) {
         cv::Mat crop = getRotateCropImage(img, box.box);
         std::string text = recognizer_->recognize(crop);
@@ -131,31 +122,60 @@ bool OcrPack::findTemplate(const cv::Mat& scene, const cv::Mat& templ,
                            ImagePreprocessor::Strategy strategy,
                            double threshold, cv::Point& out_pos) {
     if (scene.empty() || templ.empty()) return false;
-    if (templ.rows > scene.rows || templ.cols > scene.cols) return false;
 
-    // 使用 ImagePreprocessor 对场景图和模板图做相同的预处理
+    auto total_start = std::chrono::steady_clock::now();
+    auto scene_process_start = std::chrono::steady_clock::now();
     cv::Mat proc_scene = ImagePreprocessor::process(scene, strategy);
-    cv::Mat proc_templ = ImagePreprocessor::process(templ, strategy);
+    auto scene_process_end = std::chrono::steady_clock::now();
+    Logger::debug("[耗时][模板匹配] 场景预处理={}ms 场景={}x{} 模板={}x{}",std::chrono::duration_cast<std::chrono::milliseconds>(scene_process_end - scene_process_start).count(),scene.cols,scene.rows,templ.cols,templ.rows);
 
-    // 预处理后可能变为单通道，需要保证两者通道数一致
-    if (proc_scene.channels() != proc_templ.channels()) {
-        if (proc_scene.channels() == 1)
-            cv::cvtColor(proc_scene, proc_scene, cv::COLOR_GRAY2BGR);
-        if (proc_templ.channels() == 1)
-            cv::cvtColor(proc_templ, proc_templ, cv::COLOR_GRAY2BGR);
+    double best_val = -1.0;
+    cv::Point best_loc;
+    cv::Size best_size;
+    const std::vector<double> scales = {0.75, 0.9, 1.0, 1.1, 1.25, 1.5};
+
+    for (double scale : scales) {
+        auto scale_start = std::chrono::steady_clock::now();
+        cv::Mat scaled_templ;
+        cv::resize(templ, scaled_templ, cv::Size(), scale, scale, cv::INTER_AREA);
+        auto resize_end = std::chrono::steady_clock::now();
+        if (scaled_templ.empty()) continue;
+        if (scaled_templ.rows > scene.rows || scaled_templ.cols > scene.cols) continue;
+
+        cv::Mat proc_templ = ImagePreprocessor::process(scaled_templ, strategy);
+        auto templ_process_end = std::chrono::steady_clock::now();
+        cv::Mat match_scene = proc_scene;
+
+        if (match_scene.channels() != proc_templ.channels()) {
+            if (match_scene.channels() == 1) {
+                cv::cvtColor(match_scene, match_scene, cv::COLOR_GRAY2BGR);
+            }
+            if (proc_templ.channels() == 1) {
+                cv::cvtColor(proc_templ, proc_templ, cv::COLOR_GRAY2BGR);
+            }
+        }
+
+        cv::Mat result;
+        cv::matchTemplate(match_scene, proc_templ, result, cv::TM_CCOEFF_NORMED);
+        auto match_end = std::chrono::steady_clock::now();
+
+        double max_val = 0.0;
+        cv::Point max_loc;
+        cv::minMaxLoc(result, nullptr, &max_val, nullptr, &max_loc);
+        auto minmax_end = std::chrono::steady_clock::now();
+        Logger::debug("[耗时][模板匹配][缩放={}] 调整模板={}ms 模板预处理={}ms 匹配={}ms 取最大值={}ms 分数={} 尺寸={}x{} 位置=({}, {})",scale,std::chrono::duration_cast<std::chrono::milliseconds>(resize_end - scale_start).count(),std::chrono::duration_cast<std::chrono::milliseconds>(templ_process_end - resize_end).count(),std::chrono::duration_cast<std::chrono::milliseconds>(match_end - templ_process_end).count(),std::chrono::duration_cast<std::chrono::milliseconds>(minmax_end - match_end).count(),max_val,scaled_templ.cols,scaled_templ.rows,max_loc.x,max_loc.y);
+        if (max_val > best_val) {
+            best_val = max_val;
+            best_loc = max_loc;
+            best_size = scaled_templ.size();
+        }
     }
 
-    cv::Mat result;
-    cv::matchTemplate(proc_scene, proc_templ, result, cv::TM_CCOEFF_NORMED);
+    Logger::debug("[模板匹配] 最佳分数={} 阈值={} 最佳尺寸={}x{} 总耗时={}ms",best_val,threshold,best_size.width,best_size.height,std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - total_start).count());
 
-    double max_val;
-    cv::Point max_loc;
-    cv::minMaxLoc(result, nullptr, &max_val, nullptr, &max_loc);
-
-    if (max_val >= threshold) {
-        // 返回匹配区域的中心坐标（相对于原始 scene）
-        out_pos.x = max_loc.x + templ.cols / 2;
-        out_pos.y = max_loc.y + templ.rows / 2;
+    if (best_val >= threshold) {
+        out_pos.x = best_loc.x + best_size.width / 2;
+        out_pos.y = best_loc.y + best_size.height / 2;
         return true;
     }
     return false;
