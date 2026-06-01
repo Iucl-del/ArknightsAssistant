@@ -11,12 +11,13 @@
 struct TaskNode {
     // ---- 识别 ----
     std::string recognition = "DirectHit";  // DirectHit | OCR | TemplateMatch
+    std::string method = "None";            // None | Grayscale | Binary | AdaptiveBinary | Denoise | EnhanceContrast | Auto
     std::vector<std::string> expected;      // OCR 期望匹配文本（支持多个，任一匹配即成功）
     std::vector<std::string> template_paths;// TemplateMatch 模板图路径（支持多个，轮询匹配）
     std::optional<ROI> roi;                 // 识别区域（可选）
     double threshold = 0.8;                 // 匹配阈值
     int timeout = 10000;                    // 识别超时(ms)
-    int interval = 100;                     // 识别轮询间隔(ms)
+    int interval = 10;                     // 识别轮询间隔(ms)
 
     // ---- 动作 ----
     std::string action = "Click";           // Click | Swipe | Shell | StartApp | StopApp

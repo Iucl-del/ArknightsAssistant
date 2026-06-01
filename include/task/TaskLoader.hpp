@@ -1,8 +1,11 @@
 #pragma once
+
+#include "Logger.hpp"
 #include "TaskConfig.hpp"
-#include <string>
+
 #include <fstream>
-#include <iostream>
+#include <sstream>
+#include <string>
 #include <json/json.h>
 
 class TaskLoader {
@@ -10,14 +13,15 @@ public:
     static TaskConfig load_from_file(const std::string& path) {
         std::ifstream file(path);
         if (!file.is_open()) {
-            std::cerr << "无法打开任务文件: " << path << std::endl;
+            Logger::error("无法打开任务文件: {}", path);
             return TaskConfig{};
         }
+
         Json::Value root;
         Json::CharReaderBuilder builder;
         std::string errors;
         if (!Json::parseFromStream(builder, file, &root, &errors)) {
-            std::cerr << "JSON 解析失败: " << errors << std::endl;
+            Logger::error("任务 JSON 解析失败: {}", errors);
             return TaskConfig{};
         }
         return parse_task(root);
@@ -43,8 +47,8 @@ private:
             for (const auto& n : j["nodes"]) {
                 TaskNode node;
 
-                // 识别
                 node.recognition = n.get("recognition", "DirectHit").asString();
+                node.method = n.get("method", "None").asString();
 
                 if (n.isMember("expected")) {
                     const auto& e = n["expected"];
@@ -66,9 +70,8 @@ private:
 
                 node.threshold = n.get("threshold", 0.8).asDouble();
                 node.timeout = n.get("timeout", 10000).asInt();
-                node.interval = n.get("interval", 100).asInt();
+                node.interval = n.get("interval", 10).asInt();
 
-                // ROI: [x, y, w, h] 或 [x, y, w, h, base_w, base_h]
                 if (n.isMember("roi")) {
                     const auto& r = n["roi"];
                     if (r.isArray() && r.size() >= 4) {
@@ -83,7 +86,6 @@ private:
                     }
                 }
 
-                // 动作
                 node.action = n.get("action", "Click").asString();
                 if (n.isMember("target")) {
                     for (const auto& v : n["target"]) {
@@ -92,11 +94,9 @@ private:
                 }
                 node.shell_cmd = n.get("shell_cmd", "").asString();
 
-                // 延迟
                 node.pre_delay = n.get("pre_delay", 0).asInt();
                 node.post_delay = n.get("post_delay", 500).asInt();
 
-                // 失败策略
                 node.repeat_until_failed = n.get("repeat_until_failed", false).asBool();
                 node.optional = n.get("optional", false).asBool();
                 node.on_fail_jump = n.get("on_fail_jump", -1).asInt();
