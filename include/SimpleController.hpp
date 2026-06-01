@@ -47,6 +47,7 @@ public:
                                        const std::vector<std::string>& template_paths,
                                        ImagePreprocessor::Strategy strategy,
                                        double threshold,
+                                       std::optional<ROI> roi,
                                        cv::Point& out_pos);
 
 private:
@@ -57,4 +58,6 @@ private:
     std::string work_dir_;
     std::string game_package_;
     std::atomic<int> screenshot_seq_{0};
+    double input_scale_x_ = 1.0;
+    double input_scale_y_ = 1.0;
 };
