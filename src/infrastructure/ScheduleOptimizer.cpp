@@ -1,5 +1,5 @@
 #include "infrastructure/ScheduleOptimizer.hpp"
-#include <iostream>
+#include "Logger.hpp"
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -23,7 +23,7 @@ SchedulePlan ScheduleOptimizer::optimize(const OptimizerConfig& config) {
     stats_ = Stats{};
     stats_.initial_score = current_score;
 
-    std::cout << "[Optimizer] 初始解效率: " << current_score << std::endl;
+    Logger::info("[Optimizer] 初始分数: {}", current_score);
 
     // ===== Step 2: 模拟退火 =====
     double temperature = config.initial_temperature;
@@ -40,7 +40,7 @@ SchedulePlan ScheduleOptimizer::optimize(const OptimizerConfig& config) {
             // 重新加热
             temperature = config.initial_temperature * 0.5;
             plateau_count = 0;
-            std::cout << "[Optimizer] 重新加热，迭代: " << iter << std::endl;
+            Logger::info("[Optimizer] 在第 {} 次迭代重新加热", iter);
         }
 
         // 生成邻域解
@@ -86,10 +86,7 @@ SchedulePlan ScheduleOptimizer::optimize(const OptimizerConfig& config) {
 
         // 进度输出
         if ((iter + 1) % 10000 == 0) {
-            std::cout << "[Optimizer] 迭代 " << (iter + 1)
-                      << ", 当前: " << current_score
-                      << ", 最优: " << best_score
-                      << ", 温度: " << temperature << std::endl;
+            Logger::info("[Optimizer] 迭代 {}, 当前={}, 最佳={}, 温度={}", iter + 1, current_score, best_score, temperature);
         }
     }
 
@@ -111,13 +108,7 @@ SchedulePlan ScheduleOptimizer::optimize(const OptimizerConfig& config) {
     }
     stats_.time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
 
-    std::cout << "[Optimizer] 优化完成!" << std::endl;
-    std::cout << "  初始效率: " << stats_.initial_score << std::endl;
-    std::cout << "  最终效率: " << stats_.final_score << std::endl;
-    std::cout << "  提升: " << stats_.improvement_percent << "%" << std::endl;
-    std::cout << "  耗时: " << stats_.time_ms << "ms" << std::endl;
-    std::cout << "  迭代: " << stats_.total_iterations << std::endl;
-    std::cout << "  接受: " << stats_.accepted_moves << ", 拒绝: " << stats_.rejected_moves << std::endl;
+    Logger::info("[Optimizer] 完成: 初始={}, 最终={}, 提升={}%, 耗时={}ms, 迭代={}, 接受={}, 拒绝={}", stats_.initial_score, stats_.final_score, stats_.improvement_percent, stats_.time_ms, stats_.total_iterations, stats_.accepted_moves, stats_.rejected_moves);
 
     return build_plan(best, best_score);
 }

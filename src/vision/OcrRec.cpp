@@ -1,6 +1,6 @@
 #include "OcrRec.hpp"
+#include "Logger.hpp"
 #include <fstream>
-#include <iostream>
 
 TextRecognizer::TextRecognizer(Ort::Env& env, const std::string& model_path,
                                const std::string& dict_path, const Ort::SessionOptions& session_options)
@@ -34,7 +34,7 @@ TextRecognizer::TextRecognizer(Ort::Env& env, const std::string& model_path,
 void TextRecognizer::loadDict(const std::string& dict_path) {
     std::ifstream file(dict_path);
     if (!file.is_open()) {
-        std::cerr << "无法打开字典文件: " << dict_path << std::endl;
+        Logger::error("无法打开字典文件: {}", dict_path);
         return;
     }
 
