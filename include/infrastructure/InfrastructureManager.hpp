@@ -113,7 +113,7 @@ public:
     /**
      * @brief 扫描当前基建布局
      * @return 是否扫描成功
-     * @note TODO: 待实现OCR识别，当前使用默认243布局
+     * @note 调用前应已位于基建浏览页面；函数会进入进驻总览并滚动扫描设施类型、编号和生产/贸易选项。
      */
     bool scan_infrastructure();
 
