@@ -91,36 +91,23 @@ cd vcpkg
 ./bootstrap-vcpkg.sh          # Windows: bootstrap-vcpkg.bat
 export VCPKG_ROOT=$PWD/vcpkg  # Windows: set VCPKG_ROOT=%cd%\vcpkg
 
-# 配置 + 编译（选择对应平台预设）
-cmake --preset linux      # Linux x64
-cmake --preset windows    # Windows x64
-cmake --preset macos          # macOS
-
-cmake --build --preset linux   # preset 名与上一行对应
+# 配置 + 编译（以下以 Linux 为例）
+cd ArknightsAssistant
+cmake --preset linux
+cmake --build --preset linux-debug
 ```
 
 构建过程中 CMake 会自动：
 1. 通过 vcpkg 下载编译 OpenCV、jsoncpp
 2. 从 GitHub Releases 下载对应平台的 ONNX Runtime 预构建包
 
-#### 方式 B — 系统包（Linux 快速部署）
+**三平台构建命令**
 
-```bash
-# 安装系统依赖
-sudo apt install libopencv-dev libjsoncpp-dev cmake ninja-build g++
-
-# 编译（ONNX Runtime 自动下载）
-cmake --preset linux-x64
-cmake --build --preset linux-x64
-```
-
-**全部预设一览：**
-
-| 预设名 | 平台 | 依赖管理 |
-|--------|------|----------|
-| `linux` | Linux x64 | vcpkg |
-| `windows` | windows x64 | vcpkg |
-| `macos` | macOS | vcpkg |
+| 平台 | 配置命令 | 编译命令 |
+|------|----------|----------|
+| Linux | `cmake --preset linux` | `cmake --build --preset linux-debug` |
+| Windows | `cmake --preset windows` | `cmake --build --preset windows-debug` |
+| macOS | `cmake --preset macos` | `cmake --build --preset macos-debug` |
 
 ---
 
@@ -139,8 +126,8 @@ adb devices
 ### 第四步：运行
 
 ```bash
-# 可执行文件位于 build/<preset-name>/ 目录下
-./build/linux/ArknightsAutoBot
+# Ninja Multi-Config 生成器会按配置类型区分输出目录
+./build/linux/Debug/ArknightsAutoBot
 ```
 
 > 确保以**项目根目录**为工作目录运行，程序依赖相对路径 `resource/tasks/` 和 `models/onnx/`。
@@ -156,7 +143,7 @@ adb devices
 ```bash
 cmake --preset linux \
     -DMODELS_DOWNLOAD_URL=https://github.com/Iucl-del/ArknightsAssistant/releases/download/v1.0-models/models.tar.gz
-cmake --build --preset linux
+cmake --build --preset linux-debug
 ```
 
 ## 使用
